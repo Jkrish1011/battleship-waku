@@ -14,10 +14,39 @@ function PlayerBoard(props: {
   error: any,
   encoder: any
 }) {
-
   const {node, encoder, isLoading, player, latestMessage} = props;
+
+  const doesShipExistOn = (rowIndex: number, colIndex: number, board: number[][]) => {
+    return Boolean(board[rowIndex][colIndex])
+  }
+
+  const handleLatestMessage = async (_message: Message) => {
+    // 1. Check if the sender is not the same as the player - because we only need to handle opponent's moves.
+    // 2. If message has a move, we need to calculate if the move was a hit.
+    
+    if(_message.sender == player) {
+      return;
+    }
+
+    if(!_message.move) {
+      return;
+    }
+    const rowIndex = parseInt(_message.move.split(',')[0]);
+    const colIndex = parseInt(_message.move.split(',')[1]);
+    if(doesShipExistOn(rowIndex, colIndex, board)) {
+      let newBoard = [...board];
+      newBoard[rowIndex][colIndex] = 'X';
+      setBoard(newBoard);
+    }
+
+  }
+
+  
   useEffect(() => {
     console.log(latestMessage);
+    if(latestMessage){
+      handleLatestMessage(latestMessage);
+    }
   },[latestMessage]);
 
   useEffect(() => {
@@ -32,9 +61,6 @@ function PlayerBoard(props: {
     await sendMessage(player, 'ready');
   }
 
-  const doesShipExistOn = (row: number, col: number, board: number[][]) => {
-    return Boolean(board[row][col]);
-  }
 
   const respondToMove = async (move:string) => {
     const rowIndex = parseInt(move.split(',')[0]);

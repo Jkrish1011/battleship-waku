@@ -62,10 +62,8 @@ const decodeMessage = (wakuMessage: any, type: string) => {
       wakuMessage.payload
     );
     if (message) {
-      console.log("message found", message);
       return { timestamp, sender, message, id };
     } else {
-      console.log("inside else");
       const { timestamp, sender, move, id } = MoveMessage.decode(
         wakuMessage.payload
       );

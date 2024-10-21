@@ -1,5 +1,5 @@
 import { Message } from "../types";
-import { ChatMessage, MoveMessage, MoveReplyMessage } from "./gameUtils";
+import { ChatMessage, MoveMessage } from "./gameUtils";
 
 type AnyObject = { [key: string]: any };
 
@@ -19,99 +19,99 @@ export function removeDuplicatesByKey<T extends AnyObject>(
   });
 }
 
-export function decodeMessage(wakuMessage: any) {
-  if (!wakuMessage.payload) {
-    console.log("error in decoding: ", "nothing found");
-    return;
-  }
+// export function decodeMessage(wakuMessage: any) {
+//   if (!wakuMessage.payload) {
+//     console.log("error in decoding: ", "nothing found");
+//     return;
+//   }
 
-  // let timestamp, sender, message, id, move, hit;
+//   // let timestamp, sender, message, id, move, hit;
 
-  try {
-    const { timestamp, sender, message, id } = ChatMessage.decode(
-      wakuMessage.payload
-    );
+//   try {
+//     const { timestamp, sender, message, id } = ChatMessage.decode(
+//       wakuMessage.payload
+//     );
 
-    if (!message) {
-      throw Error("message is empty");
-    }
-    return {
-      message,
-      timestamp,
-      sender,
-      id,
-    };
-  } catch (e) {
-    try {
-      const { timestamp, sender, move, id } = MoveMessage.decode(
-        wakuMessage.payload
-      );
+//     if (!message) {
+//       throw Error("message is empty");
+//     }
+//     return {
+//       message,
+//       timestamp,
+//       sender,
+//       id,
+//     };
+//   } catch (e) {
+//     try {
+//       const { timestamp, sender, move, id } = MoveMessage.decode(
+//         wakuMessage.payload
+//       );
 
-      console.log({ move });
-      if (!move) {
-        throw Error("move is empty");
-      }
-      return {
-        move,
-        sender,
-        timestamp,
-        id,
-      };
-    } catch (e) {
-      try {
-        const { timestamp, sender, hit, id } = MoveReplyMessage.decode(
-          wakuMessage.payload
-        );
-        return {
-          hit,
-          sender,
-          timestamp,
-          id,
-        };
-      } catch (e) {
-        return {};
-      }
-    }
-  }
+//       console.log({ move });
+//       if (!move) {
+//         throw Error("move is empty");
+//       }
+//       return {
+//         move,
+//         sender,
+//         timestamp,
+//         id,
+//       };
+//     } catch (e) {
+//       try {
+//         const { timestamp, sender, hit, id } = MoveReplyMessage.decode(
+//           wakuMessage.payload
+//         );
+//         return {
+//           hit,
+//           sender,
+//           timestamp,
+//           id,
+//         };
+//       } catch (e) {
+//         return {};
+//       }
+//     }
+//   }
 
-  // if (!message) {
+// if (!message) {
 
-  //   // check if this is a move message / hit message
-  //    ({ timestamp, sender, move, id } = MoveMessage.decode(wakuMessage.payload));
+//   // check if this is a move message / hit message
+//    ({ timestamp, sender, move, id } = MoveMessage.decode(wakuMessage.payload));
 
-  //   if (move) {
+//   if (move) {
 
-  //     console.log('decoding message: ', {move,
-  //         sender,
-  //         timestamp,
-  //         id});
-  //     // respondToMove(move);
-  //     return {
-  //       move,
-  //       sender,
-  //       timestamp,
-  //       id
-  //     };
+//     console.log('decoding message: ', {move,
+//         sender,
+//         timestamp,
+//         id});
+//     // respondToMove(move);
+//     return {
+//       move,
+//       sender,
+//       timestamp,
+//       id
+//     };
 
-  //   }
+//   }
 
-  //   ({ timestamp, sender, hit, id } = MoveReplyMessage.decode(wakuMessage.payload));
-  //   return {
-  //     hit,
-  //     sender,
-  //     timestamp,
-  //     id
-  //   };
+//   ({ timestamp, sender, hit, id } = MoveReplyMessage.decode(wakuMessage.payload));
+//   return {
+//     hit,
+//     sender,
+//     timestamp,
+//     id
+//   };
 
-  // }
+// }
 
-  // return {
-  //   message,
-  //   timestamp,
-  //   sender,
-  //   id
-  // };
-}
+// return {
+//   message,
+//   timestamp,
+//   sender,
+//   id
+// };
+// }
 
 export function findLatestMessage(messages: Message[]): Message | undefined {
   if (!messages || messages.length === 0) {
