@@ -3,7 +3,7 @@ import React, { useState, useEffect } from "react";
 
 import { Player, Message } from "../types";
 
-import { BOARD_SIZE, createBoard, Ship, SHIPS, ChatMessage } from "../utils/gameUtils";
+import { BOARD_SIZE, createBoard, Ship, SHIPS, ChatMessage, MoveReplyMessage } from "../utils/gameUtils";
 import { useLightPush } from "@waku/react";
 
 function PlayerBoard(props: { 
@@ -33,12 +33,18 @@ function PlayerBoard(props: {
     }
     const rowIndex = parseInt(_message.move.split(',')[0]);
     const colIndex = parseInt(_message.move.split(',')[1]);
-    if(doesShipExistOn(rowIndex, colIndex, board)) {
+    let hitOrMissFlag = doesShipExistOn(rowIndex, colIndex, board);
+    if(hitOrMissFlag) {
       let newBoard = [...board];
       newBoard[rowIndex][colIndex] = 'X';
       setBoard(newBoard);
     }
 
+    const hitOrMiss = hitOrMissFlag? "hit":"miss";
+
+    // Create a new MoveReplyMessage
+    // Send this message to the opponent board
+    await sendMoveReplyMessage(hitOrMiss);
   }
 
   
@@ -185,6 +191,38 @@ function PlayerBoard(props: {
 
       // 2/ Serialize message
       const serializedMessage = ChatMessage.encode(newMessage).finish();
+
+      // 3/ Push Message
+      if (push) {
+        const pushRes = await push({
+          timestamp: new Date(),
+          payload: serializedMessage
+        });
+        // console.log({pushRes});
+
+        if (pushRes?.errors?.length && pushRes?.errors?.length) {
+          alert('unable to connect to a stable node. please reload the page!');
+        }
+      }
+  }
+
+  const sendMoveReplyMessage = async (hit: string) => {
+    /*
+      1/ Create a message
+      2/ Serialize the message
+      3/ Use push functionality to send the message
+    */
+
+      // 1/ create message
+      const newMessage = MoveReplyMessage.create({
+        timestamp: Date.now(),
+        hit:hit,
+        sender: player,
+        id: crypto.randomUUID()
+      });
+
+      // 2/ Serialize message
+      const serializedMessage = MoveReplyMessage.encode(newMessage).finish();
 
       // 3/ Push Message
       if (push) {

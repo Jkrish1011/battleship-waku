@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Player, Message } from "../types";
 import { createBoard, MoveMessage } from "../utils/gameUtils";
 import { useLightPush } from "@waku/react";
@@ -9,11 +9,18 @@ const OpponentBoard = (props: {
     encoder: any,
     latestMessage?: Message,
 }) => {
+    const {node, encoder, player, latestMessage} = props;
+
+    useEffect(() => {
+      if(latestMessage) {
+        console.log(latestMessage);
+      }
+    }, [latestMessage]);
 
     const [board, setBoard] = useState(createBoard());
     const [move, setMove] = useState<string>('');
 
-    const {node, encoder, player, latestMessage} = props;
+    
     const { push } = useLightPush({node, encoder});
 
     const sendMoveMessage = async (rowIndex: any, colIndex: any) => {
