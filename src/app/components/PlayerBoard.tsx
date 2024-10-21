@@ -1,9 +1,9 @@
 "use client"
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 
 import { Player } from "../types";
 
-import { BOARD_SIZE, createBoard, Ship, SHIPS } from "../utils/gameUtils";
+import { BOARD_SIZE, createBoard, Ship, SHIPS, ChatMessage } from "../utils/gameUtils";
 import { useLightPush } from "@waku/react";
 
 function PlayerBoard(props: { 
@@ -13,7 +13,15 @@ function PlayerBoard(props: {
   error: any,
   encoder: any
 }) {
-  const {node, encoder} = props;
+
+  const {node, encoder, isLoading, player, error} = props;
+  console.log(node, error);
+  useEffect(() => {
+    if (!isLoading) {
+      sendMessage(player, 'joined');
+    }
+  }, [isLoading]);
+
   const { push } = useLightPush({node, encoder});
 
   const doesShipExistOn = (row: number, col: number, board: number[][]) => {
@@ -131,6 +139,30 @@ function PlayerBoard(props: {
       2/ Serialize the message
       3/ Use push functionality to send the message
     */
+
+      // 1/ create message
+      const newMessage = ChatMessage.create({
+        timestamp: Date.now(),
+        message,
+        sender,
+        id: crypto.randomUUID()
+      });
+
+      // 2/ Serialize message
+      const serializedMessage = ChatMessage.encode(newMessage).finish();
+
+      // 3/ Push Message
+      if (push) {
+        const pushRes = await push({
+          timestamp: new Date(),
+          payload: serializedMessage
+        });
+        console.log({pushRes});
+
+        if (pushRes?.errors?.length && pushRes?.errors?.length) {
+          alert('unable to connect to a stable node. please reload the page!');
+        }
+      }
   }
 
   return (

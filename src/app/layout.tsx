@@ -4,7 +4,7 @@ import React from "react";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { LightNodeProvider } from "@waku/react";
-import { Protocols } from "@waku/sdk/";
+import { Protocols } from "@waku/sdk";
 
 const inter = Inter({ subsets: ["latin"] });
 
