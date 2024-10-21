@@ -46,4 +46,26 @@ const ChatMessage = new protobuf.Type("ChatMessage")
   .add(new protobuf.Field("message", 3, "string"))
   .add(new protobuf.Field("id", 4, "string"));
 
-export { isGameReady, BOARD_SIZE, createBoard, SHIPS, ChatMessage };
+const decodeMessage = (wakuMessage: any) => {
+  if (!wakuMessage.payload) {
+    console.log("No payload found!");
+    return {};
+  }
+  try {
+    const { timestamp, sender, message, id } = ChatMessage.decode(
+      wakuMessage.payload
+    );
+    return { timestamp, sender, message, id };
+  } catch (err) {
+    console.error(err);
+  }
+};
+
+export {
+  isGameReady,
+  BOARD_SIZE,
+  createBoard,
+  SHIPS,
+  ChatMessage,
+  decodeMessage,
+};

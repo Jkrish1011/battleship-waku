@@ -15,7 +15,7 @@ function PlayerBoard(props: {
 }) {
 
   const {node, encoder, isLoading, player, error} = props;
-  console.log(node, error);
+  
   useEffect(() => {
     if (!isLoading) {
       sendMessage(player, 'joined');
@@ -157,7 +157,7 @@ function PlayerBoard(props: {
           timestamp: new Date(),
           payload: serializedMessage
         });
-        console.log({pushRes});
+        // console.log({pushRes});
 
         if (pushRes?.errors?.length && pushRes?.errors?.length) {
           alert('unable to connect to a stable node. please reload the page!');

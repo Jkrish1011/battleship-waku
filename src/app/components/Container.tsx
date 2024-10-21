@@ -1,10 +1,11 @@
 'use client'
-import React from "react";
+import React, { useState, useEffect } from "react";
 
 import PlayerBoard from "./PlayerBoard";
-import { Player } from "../types";
+import { Player, Message } from "../types";
 import OpponentBoard from "./OpponentBoard";
 import { useContentPair, useFilterMessages, useWaku } from "@waku/react";
+import { decodeMessage } from "../utils/gameUtils";
 
 
 const Container = (props: {
@@ -12,6 +13,7 @@ const Container = (props: {
 }) => {
 
     const {player} = props;
+    const [messages, setMessages] = useState<Message[]>();
 
     // This provides the node which we will use for the communication.
     const { node, isLoading, error} = useWaku();
@@ -20,7 +22,16 @@ const Container = (props: {
     const {decoder, encoder} = useContentPair();
 
     // Array of all the messages which are sent over the content topic(particular to this example)
-    const {messages:filterMessages} = useFilterMessages({node, decoder});
+    const {messages: filterMessages} = useFilterMessages({node, decoder});
+
+    useEffect(() => {
+        // 1. Define a decodeMessage function
+        // 2. Map over filterMessages using decodeMessage function
+        const decodedMessages = filterMessages.map(decodeMessage);
+        // console.log(decodedMessages);
+        setMessages(decodedMessages as Message[]);
+    }, [filterMessages]);
+
     return (
         <div className="grid grid-cols-2 gap-4">
         <div className="flex flex-col">
@@ -55,8 +66,19 @@ const Container = (props: {
         <h3 className="text-lg font-semibold border-b border-gray-700 pb-2 mb-4">Messages:</h3>
 
         <ul className="space-y-2 overflow-y-auto max-h-64">
+            {
+                messages && messages.map((_message: Message, idx) => {
+                    return (
+                        <li key={idx} className={`flex items-center ${_message.sender === Player.p1? `justify-end`: `justify-start`}`}>
+                            <div className={`${_message.sender === Player.p1 ? 'bg-blue-500': 'bg-green-500'} text-sm text-white py-2 px-4 rounded-lg max-w-xs`}>
+                                <p className="font-bold">{_message.sender}</p>
+                                <p>{_message.message}</p>
+                            </div>
+                        </li>
+                    )
+                })
+            }
 
-                
         </ul>
         </div>
         </div>
