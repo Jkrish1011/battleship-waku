@@ -52,7 +52,7 @@ const MoveMessage = new protobuf.Type("MoveMessage")
   .add(new protobuf.Field("move", 5, "string")) // type::[row,col]
   .add(new protobuf.Field("id", 4, "string"));
 
-const MoveReplyMessage = new protobuf.Type("MoveMessage")
+const MoveReplyMessage = new protobuf.Type("MoveReplyMessage")
   .add(new protobuf.Field("timestamp", 1, "uint64"))
   .add(new protobuf.Field("sender", 2, "string"))
   .add(new protobuf.Field("hit", 6, "string")) // hit/miss

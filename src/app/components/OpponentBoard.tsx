@@ -11,9 +11,32 @@ const OpponentBoard = (props: {
 }) => {
     const {node, encoder, player, latestMessage} = props;
 
+    const handleHit = (hit: string) => {
+      const newBoard = [...board];
+      const rowIndex = parseInt(move.split(',')[0]);
+      const colIndex = parseInt(move.split(',')[1]);
+      newBoard[rowIndex][colIndex] = hit;
+      setBoard(newBoard);
+    }
+
+    const handlelatestMessage = async (latestMessage: Message) => {
+      // 1. Check if the sender is not the same as the player - because we only need to handle opponent's moves.
+      if(latestMessage.sender == player) {
+        return;
+      }
+
+      if (!latestMessage.hit) {
+        return;
+      }
+
+      if(latestMessage.hit){
+        handleHit(latestMessage.hit);
+      }
+    }
+
     useEffect(() => {
       if(latestMessage) {
-        console.log(latestMessage);
+        handlelatestMessage(latestMessage);
       }
     }, [latestMessage]);
 

@@ -71,7 +71,7 @@ const Container = (props: {
                     Opponent Board
                 </h1>
 
-                <OpponentBoard player={player} encoder={encoder} node={node} />
+                <OpponentBoard player={player} encoder={encoder} node={node} latestMessage={latestMessage} />
             </div>
             }
 
