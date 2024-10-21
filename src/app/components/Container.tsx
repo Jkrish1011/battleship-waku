@@ -5,7 +5,8 @@ import PlayerBoard from "./PlayerBoard";
 import { Player, Message } from "../types";
 import OpponentBoard from "./OpponentBoard";
 import { useContentPair, useFilterMessages, useWaku } from "@waku/react";
-import { decodeMessage } from "../utils/gameUtils";
+import { decodeMessage, isGameReady } from "../utils/gameUtils";
+import Spinner from "./Spinner";
 
 
 const Container = (props: {
@@ -32,6 +33,10 @@ const Container = (props: {
         setMessages(decodedMessages as Message[]);
     }, [filterMessages]);
 
+    if (isLoading) {
+        return <Spinner />
+    }
+
     return (
         <div className="grid grid-cols-2 gap-4">
         <div className="flex flex-col">
@@ -46,15 +51,18 @@ const Container = (props: {
                 encoder={encoder}
             />
 
-
-            
-            <div className="grid grid-cols-1 gap-4">
+            {
+                // 1. Hide the opponent board until both players are ready.
+                // Define function to check if players are ready.
+                messages && isGameReady(messages) && 
+                <div className="grid grid-cols-1 gap-4">
                 <h1 className="text-lg font-bold text-center">
                     Opponent Board
                 </h1>
 
                 <OpponentBoard player={player} />
             </div>
+            }
 
         </div>
 
@@ -65,7 +73,7 @@ const Container = (props: {
 
         <h3 className="text-lg font-semibold border-b border-gray-700 pb-2 mb-4">Messages:</h3>
 
-        <ul className="space-y-2 overflow-y-auto max-h-64">
+        <ul className="space-y-2 overflow-y-auto max-h-50">
             {
                 messages && messages.map((_message: Message, idx) => {
                     return (

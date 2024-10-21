@@ -52,7 +52,7 @@ const Page = () => {
     <button
       className={`mt-2 px-4 py-2 rounded-md text-white font-bold ${!Boolean(room) || !Boolean(username) ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-500 hover:bg-green-700'}`}
       disabled={!Boolean(room) || !Boolean(username)}
-      onClick={() => {router.push(`/join/${generateThreeDigitNumber()}?username=${username}`)}}>
+      onClick={() => {router.push(`/join/${room}?username=${username}`)}}>
       Join this room
     </button>
   </div>

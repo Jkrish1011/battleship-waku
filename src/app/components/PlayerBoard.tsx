@@ -24,6 +24,10 @@ function PlayerBoard(props: {
 
   const { push } = useLightPush({node, encoder});
 
+  const sendReadyToPlay = async () => {
+    await sendMessage(player, 'ready');
+  }
+
   const doesShipExistOn = (row: number, col: number, board: number[][]) => {
     return Boolean(board[row][col]);
   }
@@ -133,6 +137,7 @@ function PlayerBoard(props: {
     }
   };
 
+  // This is the function which will sent the message betweent the players in real time.
   const sendMessage = async (sender: string, message: string) => {
     /*
       1/ Create a message
@@ -216,6 +221,7 @@ function PlayerBoard(props: {
   reset
   </button>
   <button
+    onClick={sendReadyToPlay}
     className={`px-6 py-2 font-bold text-lg rounded transition-colors duration-150 ${
       areAllShipsPlaced() ? 'bg-green-500 text-white hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-50' : 'bg-gray-500 text-gray-200 cursor-not-allowed'}`}
   >
