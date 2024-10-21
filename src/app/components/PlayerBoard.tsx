@@ -1,12 +1,13 @@
 "use client"
 import React, { useState, useEffect } from "react";
 
-import { Player } from "../types";
+import { Player, Message } from "../types";
 
 import { BOARD_SIZE, createBoard, Ship, SHIPS, ChatMessage } from "../utils/gameUtils";
 import { useLightPush } from "@waku/react";
 
 function PlayerBoard(props: { 
+  latestMessage?: Message,
   player: Player,
   node: any,
   isLoading: boolean,
@@ -14,8 +15,11 @@ function PlayerBoard(props: {
   encoder: any
 }) {
 
-  const {node, encoder, isLoading, player, error} = props;
-  
+  const {node, encoder, isLoading, player, latestMessage} = props;
+  useEffect(() => {
+    console.log(latestMessage);
+  },[latestMessage]);
+
   useEffect(() => {
     if (!isLoading) {
       sendMessage(player, 'joined');

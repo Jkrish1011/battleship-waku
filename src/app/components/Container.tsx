@@ -7,6 +7,7 @@ import OpponentBoard from "./OpponentBoard";
 import { useContentPair, useFilterMessages, useWaku } from "@waku/react";
 import { decodeMessage, isGameReady } from "../utils/gameUtils";
 import Spinner from "./Spinner";
+import { findLatestMessage } from "../utils";
 
 
 const Container = (props: {
@@ -15,7 +16,10 @@ const Container = (props: {
 
     const {player} = props;
     const [messages, setMessages] = useState<Message[]>();
+    const [latestMessage, setLatestMessage] = useState<Message>();
 
+
+    console.log(messages);
     // This provides the node which we will use for the communication.
     const { node, isLoading, error} = useWaku();
 
@@ -28,9 +32,15 @@ const Container = (props: {
     useEffect(() => {
         // 1. Define a decodeMessage function
         // 2. Map over filterMessages using decodeMessage function
-        const decodedMessages = filterMessages.map(decodeMessage);
+        const decodedMessages = filterMessages.map((item) => decodeMessage(item, ''));
         // console.log(decodedMessages);
-        setMessages(decodedMessages as Message[]);
+        if(decodedMessages) {
+            setMessages(decodedMessages as Message[]);
+            const _latestMessage = findLatestMessage(decodedMessages as Message[]);
+            setLatestMessage(_latestMessage);
+        }
+        
+
     }, [filterMessages]);
 
     if (isLoading) {
@@ -44,6 +54,7 @@ const Container = (props: {
                 Your Board
             </h1>
             <PlayerBoard 
+                latestMessage={latestMessage}
                 player={player} 
                 node={node}
                 isLoading={isLoading}
@@ -60,7 +71,7 @@ const Container = (props: {
                     Opponent Board
                 </h1>
 
-                <OpponentBoard player={player} />
+                <OpponentBoard player={player} encoder={encoder} node={node} />
             </div>
             }
 
@@ -80,7 +91,7 @@ const Container = (props: {
                         <li key={idx} className={`flex items-center ${_message.sender === Player.p1? `justify-end`: `justify-start`}`}>
                             <div className={`${_message.sender === Player.p1 ? 'bg-blue-500': 'bg-green-500'} text-sm text-white py-2 px-4 rounded-lg max-w-xs`}>
                                 <p className="font-bold">{_message.sender}</p>
-                                <p>{_message.message}</p>
+                                <p>{_message.move || _message.message }</p>
                             </div>
                         </li>
                     )

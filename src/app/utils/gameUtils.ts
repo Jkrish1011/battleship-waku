@@ -46,7 +46,13 @@ const ChatMessage = new protobuf.Type("ChatMessage")
   .add(new protobuf.Field("message", 3, "string"))
   .add(new protobuf.Field("id", 4, "string"));
 
-const decodeMessage = (wakuMessage: any) => {
+const MoveMessage = new protobuf.Type("MoveMessage")
+  .add(new protobuf.Field("timestamp", 1, "uint64"))
+  .add(new protobuf.Field("sender", 2, "string"))
+  .add(new protobuf.Field("move", 5, "string")) // type::[row,col]
+  .add(new protobuf.Field("id", 4, "string"));
+
+const decodeMessage = (wakuMessage: any, type: string) => {
   if (!wakuMessage.payload) {
     console.log("No payload found!");
     return {};
@@ -55,7 +61,18 @@ const decodeMessage = (wakuMessage: any) => {
     const { timestamp, sender, message, id } = ChatMessage.decode(
       wakuMessage.payload
     );
-    return { timestamp, sender, message, id };
+    if (message) {
+      console.log("message found", message);
+      return { timestamp, sender, message, id };
+    } else {
+      console.log("inside else");
+      const { timestamp, sender, move, id } = MoveMessage.decode(
+        wakuMessage.payload
+      );
+      if (move) {
+        return { timestamp, sender, move, id };
+      }
+    }
   } catch (err) {
     console.error(err);
   }
@@ -67,5 +84,6 @@ export {
   createBoard,
   SHIPS,
   ChatMessage,
+  MoveMessage,
   decodeMessage,
 };
