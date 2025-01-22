@@ -13,7 +13,7 @@ import { findLatestMessage } from "../utils";
 const Container = (props: {
     player: Player
 }) => {
-
+    console.log('inside the container!');
     const {player} = props;
     const [messages, setMessages] = useState<Message[]>();
     const [latestMessage, setLatestMessage] = useState<Message>();

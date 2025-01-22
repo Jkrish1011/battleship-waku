@@ -1,5 +1,6 @@
 "use client"
 import { useRouter } from "next/navigation";
+import WasmSample from "./components/WasmSample";
 
 export default function Home() {
 
@@ -12,8 +13,10 @@ export default function Home() {
   return (
     <>
       <div className="flex flex-col items-center justify-center min-h-screen">
+        <WasmSample />
         <h1 className="text-3xl font-bold">
           Battleship Game
+          
         </h1>
         <button 
           onClick={handleClick}
