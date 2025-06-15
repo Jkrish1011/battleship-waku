@@ -5,10 +5,21 @@ include "circomlib/circuits/pedersen.circom";
 include "./merkletree.circom";
 
 template RangeCheck(n) {
-  signal input in;
-  signal output out;
-  out <== in;
-  assert(in >= 0 && in < n);
+    signal input in;
+    signal output out;
+    
+    // Use constraint-based validation instead of assert
+    component lt = LessThan(8);
+    lt.in[0] <== in;
+    lt.in[1] <== n;
+    lt.out === 1;
+    
+    component gte = GreaterEqThan(8);
+    gte.in[0] <== in;
+    gte.in[1] <== 0;
+    gte.out === 1;
+    
+    out <== in;
 }
 
 template InRange() {
@@ -87,6 +98,7 @@ template ValidateShipBounds() {
 
 template ShipPlacement() {
     signal input ships[5][4]; // Private: [start_x, start_y, length, orientation(0=horizontal, 1=vertical)]
+    signal input board_state[100]; // Private: Claimed board state to verify against ships
     signal input salt; // Private: Blinding factor for the merkle tree
 
     signal input commitment; // Public: Pedersen Commitment 
@@ -95,27 +107,35 @@ template ShipPlacement() {
     // Ship Sizes: [3, 3, 2, 2, 2]
     var ship_sizes[5] = [3, 3, 2, 2, 2];
 
-    // Initialize the board
-    signal board[100];
+    // Validate input board_state is either 0 or 1.
+    for (var i = 0; i < 100; i++) {
+        board_state[i] * (board_state[i] - 1) === 0;
+    }
 
-    // Declare all components and signals outside loops
+    // Initialize the board
+    signal expected_board[100];
+
+    // Declare all components and signals
     component x_checks[5];
     component y_checks[5];
     component bounds_checks[5];
     signal ship_occupancy[100][5];  // [cell_index][ship_index]
     component occupied_checks[100][5];  // [cell_index][ship_index]
 
-    // Validate All ship properties.
+        // Validate All ship properties.
     for (var s = 0; s < 5; s++) {
-        // check coordinates and orientation
+        // Check coordinates and orientation
         x_checks[s] = RangeCheck(10);
         x_checks[s].in <== ships[s][0];
 
         y_checks[s] = RangeCheck(10);
         y_checks[s].in <== ships[s][1];
 
+        // Validate ship length matches expected size
         ships[s][2] === ship_sizes[s];
-        ships[s][3] * (ships[s][3] - 1) === 0;  // Orientation is 0 or 1
+        
+        // Validate orientation is 0 or 1
+        ships[s][3] * (ships[s][3] - 1) === 0;
 
         // Validate the ship doesn't extend beyond the board.
         bounds_checks[s] = ValidateShipBounds();
@@ -126,9 +146,9 @@ template ShipPlacement() {
         bounds_checks[s].valid === 1;
     }
 
-    // Compute Board state.
+     // Compute Board state.
     for (var i = 0; i < 100; i++) {
-        // convert 1D index to 2D coordinates
+        // Convert 1D index to 2D coordinates
         var cell_x = i \ 10; 
         var cell_y = i % 10;
 
@@ -144,10 +164,13 @@ template ShipPlacement() {
         }
 
         // Sum occupancy from all ships
-        board[i] <== ship_occupancy[i][0] + ship_occupancy[i][1] + ship_occupancy[i][2] + ship_occupancy[i][3] + ship_occupancy[i][4];
+        expected_board[i] <== ship_occupancy[i][0] + ship_occupancy[i][1] + ship_occupancy[i][2] + ship_occupancy[i][3] + ship_occupancy[i][4];
+
+        // Ensure no overlaps in expected_board. Each should either be 0 or 1.
+        expected_board[i] * (expected_board[i] - 1) === 0;
         
-        // Ensure no overlaps (each cell should be 0 or 1)
-        board[i] * (board[i] - 1) === 0;
+        // Verify claimed board_state matches expected board generated from ships
+        board_state[i] === expected_board[i];
     }
 
     // Verify Merkle root
@@ -162,15 +185,11 @@ template ShipPlacement() {
     merkle.root === merkle_root;
 
     // Verify Commitment
-    component pedersen = Pedersen(21); // 5 * 4 + 1 
-    var idx = 0;
-    for (var s = 0; s < 5; s++) {
-        for (var i = 0; i < 4; i++) {
-            pedersen.in[idx] <== ships[s][i];
-            idx++;
-        }
+    component pedersen = Pedersen(101); // 100 board cells + 1 salt
+    for (var i = 0; i < 100; i++) {
+        pedersen.in[i] <== board[i];
     }
-    pedersen.in[idx] <== salt;
+    pedersen.in[100] <== salt;
     commitment === pedersen.out[0];
 }
 
