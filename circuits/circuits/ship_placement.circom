@@ -176,7 +176,7 @@ template ShipPlacement() {
     // Verify Merkle root
     component merkle = MerkleTreeRoot(7); // log2(100) ~ 7
     for (var i = 0; i < 100; i++) {
-        merkle.leaves[i] <== board[i];
+        merkle.leaves[i] <== board_state[i];
     }
      // Pad remaining leaves with zeros
     for (var i = 100; i < 128; i++) {
@@ -187,7 +187,7 @@ template ShipPlacement() {
     // Verify Commitment
     component pedersen = Pedersen(101); // 100 board cells + 1 salt
     for (var i = 0; i < 100; i++) {
-        pedersen.in[i] <== board[i];
+        pedersen.in[i] <== board_state[i];
     }
     pedersen.in[100] <== salt;
     commitment === pedersen.out[0];

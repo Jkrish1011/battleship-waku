@@ -40,10 +40,17 @@ template WinVerification() {
     }
 
     // Count total ship squares on the board
-    var total_ship_squares = 0;
+    signal total_ship_squares = 0;
+    // For intermediate sum.
+    signal running_sum[101];
+
+    running_sum[0] <== 0;
+    
     for (var i = 0; i < 100; i++) {
-        total_ship_squares += board_state[i];
+        running_sum[i+1] = running_sum[i] + board_state[i];
     }
+    total_ship_squares <== running_sum[101];
+
     // Verify total ship squares equals 12 (3+3+2+2+2=12)
     total_ship_squares === hit_count;
 
@@ -89,7 +96,7 @@ template WinVerification() {
     for (var i = 100; i < 128; i++) {
         merkle.leaves[i] <== 0;
     }
-    
+
     merkle.root === merkle_root;
 
     // Verify Commitment

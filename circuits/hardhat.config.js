@@ -1,35 +1,44 @@
-// hardhat.config.js
 require("@nomicfoundation/hardhat-toolbox");
 require("hardhat-circom");
 
+/** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {
   solidity: "0.8.19",
   circom: {
     inputBasePath: "./circuits",
-    outputBasePath: "./circuits/artifacts",
-    ptau: "https://hermez.s3-eu-west-1.amazonaws.com/powersOfTau28_hez_final_15.ptau",
+    ptau: "https://hermez.s3-eu-west-1.amazonaws.com/powersOfTau28_hez_final_14.ptau",
     circuits: [
       {
-        name: "ship_placement",
-        protocol: "groth16",
-        circuit: "ship_placement.circom",
-        wasm: "ship_placement.wasm",
-        zkey: "ship_placement.zkey"
+        name: "ShipPlacement",
+        circuit: "ShipPlacement.circom",
+        input: "ShipPlacement",
+        wasm: "ShipPlacement.wasm",
+        zkey: "ShipPlacement.zkey",
+      },
+      {
+        name: "MoveVerification", 
+        circuit: "MoveVerification.circom",
+        input: "MoveVerification",
+        wasm: "MoveVerification.wasm",
+        zkey: "MoveVerification.zkey",
+      },
+      {
+        name: "WinVerification",
+        circuit: "WinVerification.circom", 
+        input: "WinVerification",
+        wasm: "WinVerification.wasm",
+        zkey: "WinVerification.zkey",
       }
     ],
   },
-  paths: {
-    sources: "./circuits",
-    tests: "./test",
-    cache: "./cache",
-    artifacts: "./artifacts",
-    circuits: "./circuits",
-    circuitArtifacts: "./circuits/artifacts",
-    output: "./target"
-  },
   networks: {
     hardhat: {
-      allowUnlimitedContractSize: true
-    }
-  }
+      accounts: {
+        count: 10,
+      },
+    },
+  },
+  mocha: {
+    timeout: 200000, // 200 seconds for circuit compilation
+  },
 };
