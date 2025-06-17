@@ -49,7 +49,7 @@ template WinVerification() {
     for (var i = 0; i < 100; i++) {
         running_sum[i+1] <== running_sum[i] + board_state[i];
     }
-    total_ship_squares <== running_sum[101];
+    total_ship_squares <== running_sum[100];
 
     // Verify total ship squares equals 12 (3+3+2+2+2=12)
     total_ship_squares === hit_count;
@@ -58,6 +58,13 @@ template WinVerification() {
     component y_checks[12];
     signal hit_index[12];
 
+    // Verify this position contains a ship (board_state = 1)
+    // Use multiplier array pattern to avoid variable index access
+        
+    signal hit_selector[12][100];
+    signal hit_value[12];
+    component index_equals[12][100];
+    signal hit_accumulator[12][101]; // Intermediate accumulation signals
     // Verify all hits
     for (var i = 0; i < 12; i++) {
         // Validate hit coordinates are within bounds
@@ -70,8 +77,25 @@ template WinVerification() {
         // Calculate 1D index from 2D coordinates
         hit_index[i] <== hits[i][0] * 10 + hits[i][1];
         
-        // Verify this position contains a ship (board_state = 1)
-        board_state[hit_index[i]] === 1;
+        
+        // Create selector array where only the target index is 1, others are 0
+        
+        for (var j = 0; j < 100; j++) {
+            index_equals[i][j] = IsEqual();
+            index_equals[i][j].in[0] <== hit_index[i];
+            index_equals[i][j].in[1] <== j;
+            hit_selector[i][j] <== index_equals[i][j].out;
+        }
+        
+        // Multiply each board state by its selector and sum to get the target value
+        hit_accumulator[i][0] <== 0;
+        for (var j = 0; j < 100; j++) {
+            hit_accumulator[i][j+1] <== hit_accumulator[i][j] + board_state[j] * hit_selector[i][j];
+        }
+        hit_value[i] <== hit_accumulator[i][100];
+        
+        // Verify the selected position contains a ship
+        hit_value[i] === 1;
     }
 
     signal idx_i[12];
@@ -80,11 +104,11 @@ template WinVerification() {
     // Verify no duplicate hits (each hit position should be unique)
     // This prevents counting the same ship square multiple times
     for (var i = 0; i < 12; i++) {
+        // Calculate indices for comparison
+        idx_i[i] <== hits[i][0] * 10 + hits[i][1];
+        
         for (var j = i + 1; j < 12; j++) {
-            // Calculate indices for comparison
-            idx_i[i] <== hits[i][0] * 10 + hits[i][1];
             idx_j[i][j] <== hits[j][0] * 10 + hits[j][1];
-            
             // Ensure indices are different
             neq_out[i][j] = IsEqual();
             neq_out[i][j].in[0] <== idx_i[i];
