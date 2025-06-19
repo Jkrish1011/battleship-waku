@@ -8,19 +8,31 @@
     "test": "hardhat test",
     "node": "hardhat node",
     "deploy": "hardhat run scripts/deploy.js",
+    "generate-input": "node test/inputGenerator.js",
     "deploy:local": "hardhat run scripts/deploy.js --network localhost",
+
     "circuit:compile": "npm run circuit:compile:ship && npm run circuit:compile:move && npm run circuit:compile:win",
     "circuit:compile:ship": "circom circuits/ship_placement.circom --r1cs --wasm --sym -o build/ship_placement/",
     "circuit:compile:move": "circom circuits/move_verification.circom --r1cs --wasm --sym -o build/move_verification/",
     "circuit:compile:win": "circom circuits/win_verification.circom --r1cs --wasm --sym -o build/win_verification/",
-    "circuit:setup": "snarkjs powersoftau new bn128 14 pot14_0000.ptau -v && snarkjs powersoftau contribute pot14_0000.ptau pot14_0001.ptau --name='First contribution' -v && snarkjs powersoftau prepare phase2 pot14_0001.ptau pot14_final.ptau -v",
+
+    "circuit:setup": "snarkjs powersoftau new bn128 18 pot18_0000.ptau -v && snarkjs powersoftau contribute pot18_0000.ptau pot18_0001.ptau --name='First contribution' -v && snarkjs powersoftau prepare phase2 pot18_0001.ptau pot18_final.ptau -v",
+
+    "circuit:keys:ship": "snarkjs groth16 setup build/ship_placement/ship_placement.r1cs pot18_final.ptau keys/ship_placement_0000.zkey && snarkjs zkey contribute keys/ship_placement_0000.zkey keys/ship_placement_final.zkey --name='Ship Contributor' -v && snarkjs zkey export verificationkey keys/ship_placement_final.zkey keys/ship_verification_key.json",
+    "circuit:keys:move": "snarkjs groth16 setup build/move_verification/move_verification.r1cs pot18_final.ptau keys/move_verification_0000.zkey && snarkjs zkey contribute keys/move_verification_0000.zkey keys/move_verification_final.zkey --name='Move Contributor' -v && snarkjs zkey export verificationkey keys/move_verification_final.zkey keys/move_verification_key.json",
+    "circuit:keys:win": "snarkjs groth16 setup build/win_verification/win_verification.r1cs pot18_final.ptau keys/win_verification_0000.zkey && snarkjs zkey contribute keys/win_verification_0000.zkey keys/win_verification_final.zkey --name='Win Contributor' -v && snarkjs zkey export verificationkey keys/win_verification_final.zkey keys/win_verification_key.json",
     "circuit:keys": "npm run circuit:keys:ship && npm run circuit:keys:move && npm run circuit:keys:win",
-    "circuit:keys:ship": "snarkjs groth16 setup build/ship_placement/ship_placement.r1cs pot14_final.ptau keys/ship_placement_0000.zkey && snarkjs zkey contribute keys/ship_placement_0000.zkey keys/ship_placement_final.zkey --name='Ship Contributor' -v && snarkjs zkey export verificationkey keys/ship_placement_final.zkey keys/ship_verification_key.json",
-    "circuit:keys:move": "snarkjs groth16 setup build/move_verification/move_verification.r1cs pot14_final.ptau keys/move_verification_0000.zkey && snarkjs zkey contribute keys/move_verification_0000.zkey keys/move_verification_final.zkey --name='Move Contributor' -v && snarkjs zkey export verificationkey keys/move_verification_final.zkey keys/move_verification_key.json",
-    "circuit:keys:win": "snarkjs groth16 setup build/win_verification/win_verification.r1cs pot14_final.ptau keys/win_verification_0000.zkey && snarkjs zkey contribute keys/win_verification_0000.zkey keys/win_verification_final.zkey --name='Win Contributor' -v && snarkjs zkey export verificationkey keys/win_verification_final.zkey keys/win_verification_key.json",
+
+    "circuit:witness": "npm run circuit:witness:ship && npm run circuit:witness:move && npm run circuit:witness:win",
+    "circuit:witness:ship": "node build/ship_placement/ship_placement_js/generate_witness.js build/ship_placement/ship_placement_js/ship_placement.wasm inputs/ship_placement_input.json build/ship_placement/ship_placement_js/witness.wtns",
+    "circuit:witness:move": "node build/move_verification/move_verification_js/generate_witness.js build/move_verification/move_verification_js/move_verification.wasm inputs/move_verification_input.json build/move_verification/witness.wtns",
+    "circuit:witness:win": "node build/win_verification/win_verification_js/generate_witness.js build/win_verification/win_verification_js/win_verification.wasm inputs/win_verification_input.json build/win_verification/witness.wtns",
+    
+    "circuit:proof": "npm run circuit:proof:ship && npm run circuit:proof:move && npm run circuit:proof:win",
     "circuit:proof:ship": "snarkjs groth16 prove keys/ship_placement_final.zkey build/ship_placement/witness.wtns proofs/ship_proof.json proofs/ship_public.json",
     "circuit:proof:move": "snarkjs groth16 prove keys/move_verification_final.zkey build/move_verification/witness.wtns proofs/move_proof.json proofs/move_public.json",
     "circuit:proof:win": "snarkjs groth16 prove keys/win_verification_final.zkey build/win_verification/witness.wtns proofs/win_proof.json proofs/win_public.json",
+
     "circuit:verify:ship": "snarkjs groth16 verify keys/ship_verification_key.json proofs/ship_public.json proofs/ship_proof.json",
     "circuit:verify:move": "snarkjs groth16 verify keys/move_verification_key.json proofs/move_public.json proofs/move_proof.json",
     "circuit:verify:win": "snarkjs groth16 verify keys/win_verification_key.json proofs/win_public.json proofs/win_proof.json",
