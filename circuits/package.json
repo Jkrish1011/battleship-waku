@@ -19,6 +19,7 @@
     "circuit:keys:move": "snarkjs groth16 setup build/move_verification/move_verification.r1cs pot18_final.ptau keys/move_verification_0000.zkey && snarkjs zkey contribute keys/move_verification_0000.zkey keys/move_verification_final.zkey --name='Move Contributor' -v && snarkjs zkey export verificationkey keys/move_verification_final.zkey keys/move_verification_key.json",
     "circuit:keys:win": "snarkjs groth16 setup build/win_verification/win_verification.r1cs pot18_final.ptau keys/win_verification_0000.zkey && snarkjs zkey contribute keys/win_verification_0000.zkey keys/win_verification_final.zkey --name='Win Contributor' -v && snarkjs zkey export verificationkey keys/win_verification_final.zkey keys/win_verification_key.json",
     "circuit:keys": "npm run circuit:keys:ship && npm run circuit:keys:move && npm run circuit:keys:win",
+    
     "circuit:witness": "npm run circuit:witness:ship && npm run circuit:witness:move && npm run circuit:witness:win",
     "circuit:witness:ship": "node build/ship_placement/ship_placement_js/generate_witness.js build/ship_placement/ship_placement_js/ship_placement.wasm inputs/ship_placement_input.json build/ship_placement/ship_placement_js/witness.wtns",
     "circuit:witness:move": "node build/move_verification/move_verification_js/generate_witness.js build/move_verification/move_verification_js/move_verification.wasm inputs/move_verification_input.json build/move_verification/witness.wtns",

@@ -25,6 +25,14 @@ class BattleshipInputGenerator {
         .join('');
     }
 
+    uint8ArrayToBigInt(uint8Array) {
+        let result = BigInt(0);
+        for (let i = 0; i < uint8Array.length; i++) {
+            result = (result << BigInt(8)) | BigInt(uint8Array[i]);
+        }
+        return result;
+    }
+
     async calculateCommitment(boardState, salt) {
         if (!this.pedersenHash) {
             throw new Error("Pedersen hash not initialized. Call initialize() first.");
@@ -34,7 +42,7 @@ class BattleshipInputGenerator {
 
         // calculating the pedersen hash
         const commitment = this.pedersenHash.hash(Uint8Array.from(input));
-        return this.convertToHex(commitment);
+        return this.uint8ArrayToBigInt(commitment);
     }
 
     // Merkle Tree implementation
@@ -68,7 +76,7 @@ class BattleshipInputGenerator {
             currentLevel = nextLevel;
         }
         
-        const h = this.convertToHex(currentLevel[0]);
+        const h = this.uint8ArrayToBigInt(currentLevel[0]);
         
         return h;
     }
@@ -138,8 +146,8 @@ class BattleshipInputGenerator {
             ships: ships,
             board_state: boardState,
             salt: salt,
-            commitment: commitment, 
-            merkle_root: merkleRoot 
+            commitment: commitment.toString(), 
+            merkle_root: merkleRoot.toString()
         };
         
         console.log("\nComplete input object:");

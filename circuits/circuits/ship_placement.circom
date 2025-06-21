@@ -8,7 +8,6 @@ template RangeCheck(n) {
     signal input in;
     signal output out;
     
-    // Use constraint-based validation instead of assert
     component lt = LessThan(8);
     lt.in[0] <== in;
     lt.in[1] <== n;
@@ -104,7 +103,6 @@ template ShipPlacement() {
     signal input commitment; // Public: Pedersen Commitment 
     signal input merkle_root; // Public: Meerkle root of board state
 
-    // Ship Sizes: [3, 3, 2, 2, 2]
     var ship_sizes[5] = [3, 3, 2, 2, 2];
 
     // Validate input board_state is either 0 or 1.
@@ -146,6 +144,8 @@ template ShipPlacement() {
         bounds_checks[s].valid === 1;
     }
 
+    log("bounds_checks completed");
+
      // Compute Board state.
     for (var i = 0; i < 100; i++) {
         // Convert 1D index to 2D coordinates
@@ -173,6 +173,8 @@ template ShipPlacement() {
         board_state[i] === expected_board[i];
     }
 
+    log("expected_board completed");
+
     // Verify Merkle root
     component merkle = MerkleTreeRoot(7); // log2(100) ~ 7
     for (var i = 0; i < 100; i++) {
@@ -182,7 +184,12 @@ template ShipPlacement() {
     for (var i = 100; i < 128; i++) {
         merkle.leaves[i] <== 0;
     }
+    log("merkle tree checking...");
     merkle.root === merkle_root;
+
+    log("merkle tree completed");
+
+    log("pedersen starting...");
 
     // Verify Commitment
     component pedersen = Pedersen(101); // 100 board cells + 1 salt
@@ -191,6 +198,8 @@ template ShipPlacement() {
     }
     pedersen.in[100] <== salt;
     commitment === pedersen.out[0];
+
+    log("pedersen completed");
 }
 
 component main {public [commitment, merkle_root]} = ShipPlacement();

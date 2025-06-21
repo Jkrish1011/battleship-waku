@@ -41,5 +41,7 @@ template MerkleTreeRoot(levels) {
     }
 
     root <== nodes[total_nodes - 1];
+    log("root", root);
 }
 
+component main {public [leaves]} = MerkleTreeRoot(7);
