@@ -58,3 +58,7 @@ async function test() {
 }
 
 test().catch(console.error);
+
+module.exports = {
+    calculateMerkleRoot
+}

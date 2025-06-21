@@ -42,4 +42,4 @@ template MerkleTreeRoot(levels) {
     log("root", root);
 }
 
-component main {public [leaves]} = MerkleTreeRoot(7);
+// component main {public [leaves]} = MerkleTreeRoot(7);

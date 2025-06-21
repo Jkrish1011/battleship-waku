@@ -10,6 +10,7 @@
     "deploy": "hardhat run scripts/deploy.js",
     "generate-input": "node test/inputGenerator.js",
     "testMerkleTree": "node test/testMerkleTree.js",
+    "generateBoardCommitment": "node test/generateBoardCommitment.js",
     "deploy:local": "hardhat run scripts/deploy.js --network localhost",
 
     "circuit:compile": "npm run circuit:compile:ship && npm run circuit:compile:move && npm run circuit:compile:win",
@@ -45,7 +46,7 @@
 
     "circuit:clean": "rm -rf build/ keys/ proofs/ *.ptau"
 
-  },
+  }, 
   "keywords": [
     "circom",
     "hardhat",

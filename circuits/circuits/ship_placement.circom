@@ -190,18 +190,16 @@ template ShipPlacement() {
 
     log("merkle tree completed");
 
-    // log("Poseidon starting...");
+    log("Poseidon Boarding commitmentstarting...");
 
-    // // Verify Commitment
-    // component commitment_hash = Poseidon(101); // 100 board cells + 1 salt
-    // for (var i = 0; i < 100; i++) {
-    //     commitment_hash.inputs[i] <== board_state[i];
-    // }
-    // commitment_hash.inputs[100] <== salt;
-    // log("commitment_hash.out", commitment_hash.out);
-    // commitment === commitment_hash.out;
+   
+    component commitment_hash = Poseidon(2);
+    commitment_hash.inputs[0] <== merkle.root;
+    commitment_hash.inputs[1] <== salt;
+    log("commitment_hash.out", commitment_hash.out);
+    commitment === commitment_hash.out; // Merkle root of 100 board cells + 1 salt
 
-    // log("Poseidon completed");
+    log("Poseidon Boarding commitment completed");
 }
 
 component main {public [commitment, merkle_root]} = ShipPlacement();

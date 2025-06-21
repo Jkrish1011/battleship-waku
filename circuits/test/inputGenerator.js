@@ -15,7 +15,7 @@ class BattleshipInputGenerator {
     generateSalt() {
         const randomBytes = crypto.randomBytes(32);
         const saltBigInt = BigInt(`0x` + randomBytes.toString("hex"));
-        return saltBigInt.toString();
+        return saltBigInt;
     }
     
     convertToHex(uint8Array) {
@@ -32,48 +32,17 @@ class BattleshipInputGenerator {
         return result;
     }
 
-    async calculateCommitment(boardState, salt) {
+    async calculateCommitment(merkleRoot, salt) {
         if (!this.poseidon) {
             throw new Error("Poseidon not initialized. Call initialize() first.");
         }
-
-        // First, hash the board state in chunks
-        const boardInputs = boardState.map(x => BigInt(x));
-        let boardHash = BigInt(0);
-        
-        // Hash board state in chunks of 15 (leaving room for previous hash)
-        for (let i = 0; i < boardInputs.length; i += 15) {
-            const chunk = boardInputs.slice(i, i + 15);
-            
-            // Add previous hash to the beginning of chunk (except first chunk)
-            if (i > 0) {
-                chunk.unshift(boardHash);
-            }
-            
-            // Ensure we have at least 2 elements
-            while (chunk.length < 2) {
-                chunk.push(BigInt(0));
-            }
-            
-            const hash = this.poseidon(chunk);
-            
-            // Convert hash result to BigInt if it's a Uint8Array
-            if (hash instanceof Uint8Array) {
-                boardHash = this.uint8ArrayToBigInt(hash);
-            } else {
-                boardHash = BigInt(hash);
-            }
-        }
         
         // Finally, combine board hash with salt
-        const finalHash = this.poseidon([boardHash, BigInt(salt)]);
+        const finalHash = this.poseidon.F.toString(this.poseidon([merkleRoot, salt]));
         
         // Convert final result to BigInt
-        if (finalHash instanceof Uint8Array) {
-            return this.uint8ArrayToBigInt(finalHash);
-        } else {
-            return BigInt(finalHash);
-        }
+        return finalHash;
+        
     }
 
     // Merkle Tree implementation
@@ -116,14 +85,7 @@ class BattleshipInputGenerator {
         return currentLevel[0];
     }
 
-    async generateCorrectInput() {
-        const ships = [
-            [1, 1, 3, 0], // Ship 1: horizontal 3-length at (1,1)
-            [9, 4, 3, 1], // Ship 2: vertical 3-length at (3,2) 
-            [5, 5, 2, 0], // Ship 3: horizontal 2-length at (5,5)
-            [7, 2, 2, 1], // Ship 4: vertical 2-length at (7,2)
-            [0, 8, 2, 0]  // Ship 5: horizontal 2-length at (0,8)
-        ];
+    async generateCorrectInput(ships) {
     
         let boardState = Array(100).fill(0);
         const shipSizes = [3, 3, 2, 2, 2];
@@ -174,13 +136,13 @@ class BattleshipInputGenerator {
 
         const salt = this.generateSalt();
     
-        const commitment = await this.calculateCommitment(boardState, salt);
         const merkleRoot = await this.calculateMerkleRoot(boardState);
+        const commitment = await this.calculateCommitment(merkleRoot, salt);
         
         const input = {
             ships: ships,
             board_state: boardState,
-            salt: salt,
+            salt: salt.toString(),
             commitment: commitment.toString(), 
             merkle_root: merkleRoot.toString()
         };
@@ -270,14 +232,14 @@ if (require.main === module) {
         console.log("\n" + "=".repeat(50));
 
         const yourShips = [
-            [1, 1, 3, 0], // Ship 1: horizontal 3-length at (1,1)
-            [9, 4, 3, 1], // Ship 2: vertical 3-length at (3,2) 
-            [5, 5, 2, 0], // Ship 3: horizontal 2-length at (5,5)
-            [7, 2, 2, 1], // Ship 4: vertical 2-length at (7,2)
-            [0, 8, 2, 0]  // Ship 5: horizontal 2-length at (0,8)
+            [3, 1, 3, 0], // Ship 1: horizontal 3-length at (1,1)
+            [5, 4, 3, 1], // Ship 2: vertical 3-length at (3,2) 
+            [7, 5, 2, 0], // Ship 3: horizontal 2-length at (5,5)
+            [1, 8, 2, 1], // Ship 4: vertical 2-length at (7,2)
+            [8, 8, 2, 0]  // Ship 5: horizontal 2-length at (0,8)
         ];
 
-        const correctInput = await generator.generateCorrectInput();
+        const correctInput = await generator.generateCorrectInput(yourShips);
         
         console.log("\nValidating your original input:");
         generator.validateInput(yourShips, correctInput.board_state);
