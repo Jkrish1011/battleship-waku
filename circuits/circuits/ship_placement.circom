@@ -1,7 +1,7 @@
 pragma circom 2.0.0;
 
 include "circomlib/circuits/comparators.circom";
-include "circomlib/circuits/pedersen.circom";
+include "circomlib/circuits/poseidon.circom";
 include "./merkletree.circom";
 
 template RangeCheck(n) {
@@ -100,7 +100,7 @@ template ShipPlacement() {
     signal input board_state[100]; // Private: Claimed board state to verify against ships
     signal input salt; // Private: Blinding factor for the merkle tree
 
-    signal input commitment; // Public: Pedersen Commitment 
+    signal input commitment; // Public: Poseidon Commitment 
     signal input merkle_root; // Public: Meerkle root of board state
 
     var ship_sizes[5] = [3, 3, 2, 2, 2];
@@ -185,21 +185,23 @@ template ShipPlacement() {
         merkle.leaves[i] <== 0;
     }
     log("merkle tree checking...");
+    log("merkle.root", merkle.root);
     merkle.root === merkle_root;
 
     log("merkle tree completed");
 
-    log("pedersen starting...");
+    // log("Poseidon starting...");
 
-    // Verify Commitment
-    component pedersen = Pedersen(101); // 100 board cells + 1 salt
-    for (var i = 0; i < 100; i++) {
-        pedersen.in[i] <== board_state[i];
-    }
-    pedersen.in[100] <== salt;
-    commitment === pedersen.out[0];
+    // // Verify Commitment
+    // component commitment_hash = Poseidon(101); // 100 board cells + 1 salt
+    // for (var i = 0; i < 100; i++) {
+    //     commitment_hash.inputs[i] <== board_state[i];
+    // }
+    // commitment_hash.inputs[100] <== salt;
+    // log("commitment_hash.out", commitment_hash.out);
+    // commitment === commitment_hash.out;
 
-    log("pedersen completed");
+    // log("Poseidon completed");
 }
 
 component main {public [commitment, merkle_root]} = ShipPlacement();

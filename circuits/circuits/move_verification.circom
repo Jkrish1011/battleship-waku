@@ -24,31 +24,6 @@ template RangeCheck(n) {
     out <== in;
 }
 
-// template GuessVerification() {
-//     // Input signals
-//     signal input guess_index;  // The index to check (0-99 for a 10x10 board)
-//     signal input hit;         // The hit signal to verify against
-//     signal input board_state[100];  // The state of the board (100 positions)
-
-//     // Calculate the hit result using multiplexer
-//     component mux = Multiplexer(1, 100);  // 1-bit output, 100 possible positions
-    
-//     // Connect all board positions to multiplexer inputs
-//     for (var i = 0; i < 100; i++) {
-//         mux.inp[i][0] <== board_state[i];
-//     }
-    
-//     // Connect the guess index as selector
-//     mux.sel <== guess_index;
-    
-//     // Get the result from multiplexer
-//     signal hit_result;
-//     hit_result <== mux.out[0];
-    
-//     // Verify that the hit signal matches the board state at guess_index
-//     hit === hit_result;
-// }
-
 template MoveVerification() {
     signal input board_state[100]; // Private: 10x10 grid
     signal input guess_x; // Private 

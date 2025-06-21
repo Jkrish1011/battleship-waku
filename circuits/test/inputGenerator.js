@@ -1,16 +1,15 @@
 const crypto = require("crypto");
-const { buildPedersenHash } = require("circomlibjs");
-const buildMiMC7 = require("circomlibjs").buildMimc7;
+const { buildPoseidon } = require("circomlibjs");
 
 class BattleshipInputGenerator {
     constructor() {
-        this.pedersenHash = null;
-        this.mimc7 = null;
+        this.poseidon = null;
+        this.levels = 7;
     }
 
     async initialize() {
-        this.pedersenHash = await buildPedersenHash();
-        this.mimc7 = await buildMiMC7();
+        this.poseidon = await buildPoseidon();
+        this.levels = 7;
     }
 
     generateSalt() {
@@ -21,7 +20,7 @@ class BattleshipInputGenerator {
     
     convertToHex(uint8Array) {
         return Array.from(uint8Array)
-        .map(byte => byte.toString(16)) 
+        .map(byte => byte.toString(16))
         .join('');
     }
 
@@ -34,51 +33,87 @@ class BattleshipInputGenerator {
     }
 
     async calculateCommitment(boardState, salt) {
-        if (!this.pedersenHash) {
-            throw new Error("Pedersen hash not initialized. Call initialize() first.");
+        if (!this.poseidon) {
+            throw new Error("Poseidon not initialized. Call initialize() first.");
         }
 
-        const input = [...boardState, salt];
-
-        // calculating the pedersen hash
-        const commitment = this.pedersenHash.hash(Uint8Array.from(input));
-        return this.uint8ArrayToBigInt(commitment);
+        // First, hash the board state in chunks
+        const boardInputs = boardState.map(x => BigInt(x));
+        let boardHash = BigInt(0);
+        
+        // Hash board state in chunks of 15 (leaving room for previous hash)
+        for (let i = 0; i < boardInputs.length; i += 15) {
+            const chunk = boardInputs.slice(i, i + 15);
+            
+            // Add previous hash to the beginning of chunk (except first chunk)
+            if (i > 0) {
+                chunk.unshift(boardHash);
+            }
+            
+            // Ensure we have at least 2 elements
+            while (chunk.length < 2) {
+                chunk.push(BigInt(0));
+            }
+            
+            const hash = this.poseidon(chunk);
+            
+            // Convert hash result to BigInt if it's a Uint8Array
+            if (hash instanceof Uint8Array) {
+                boardHash = this.uint8ArrayToBigInt(hash);
+            } else {
+                boardHash = BigInt(hash);
+            }
+        }
+        
+        // Finally, combine board hash with salt
+        const finalHash = this.poseidon([boardHash, BigInt(salt)]);
+        
+        // Convert final result to BigInt
+        if (finalHash instanceof Uint8Array) {
+            return this.uint8ArrayToBigInt(finalHash);
+        } else {
+            return BigInt(finalHash);
+        }
     }
 
     // Merkle Tree implementation
     async calculateMerkleRoot(boardState) {
-        if (!this.mimc7) {
-            throw new Error("MiMC7 hash not initialized. Call initialize() first.");
+        if (!this.poseidon) {
+            throw new Error("Poseidon not initialized. Call initialize() first.");
         }
 
-        const leaves = [...boardState];
+        let leaves = [...boardState];
         while (leaves.length < 128) {
             leaves.push(0);
         }
+        // Helper function to hash two elements
+        const hash = (left, right) => {
+            return this.poseidon.F.toString(this.poseidon([left, right]));
+        };
 
-        // Conver each Leaf to BigInt
-        let currentLevel = leaves.map(leaf => BigInt(leaf));
+        // Validate input
+        if (leaves.length !== 2**this.levels) {
+            throw new Error(`Expected ${2**this.levels} leaves, got ${leaves.length}`);
+        }
 
-        while (currentLevel.length > 1) {
+        // Convert all leaves to strings (matching circuit behavior)
+        leaves = leaves.map(leaf => leaf.toString());
+
+        // Build tree level by level
+        let currentLevel = [...leaves];
+
+        for (let level = 0; level < this.levels; level++) {
             const nextLevel = [];
             for (let i = 0; i < currentLevel.length; i += 2) {
                 const left = currentLevel[i];
-                let right;
-                if (i + 1 < currentLevel.length) {
-                    right = currentLevel[i + 1];
-                } else {
-                    right = BigInt(0);
-                }
-                // Hash the pair using MiMC7
-                const hash = this.mimc7.hash(left, right);
-                nextLevel.push(hash);
+                const right = currentLevel[i+1] || currentLevel[i]; // if odd number, duplicate last
+                nextLevel.push(hash(left, right));
             }
             currentLevel = nextLevel;
         }
-        
-        const h = this.uint8ArrayToBigInt(currentLevel[0]);
-        
-        return h;
+
+        // The root is the only element left
+        return currentLevel[0];
     }
 
     async generateCorrectInput() {
@@ -201,6 +236,7 @@ class BattleshipInputGenerator {
                 }
             }
         });
+        
         // Compare expectedBoard with boardState
         let mismatches = 0;
         for (let i = 0; i < 100; i++) {
@@ -221,17 +257,15 @@ class BattleshipInputGenerator {
     }
 }
 
-
-
-
 if (require.main === module) {
-
     (async() => {
         console.log("Running input generator...");
 
         const generator = new BattleshipInputGenerator();
         await generator.initialize();
-
+        
+        // Test conversions first
+        // generator.testConversions();
 
         console.log("\n" + "=".repeat(50));
 
@@ -250,7 +284,6 @@ if (require.main === module) {
 
     })();
 }
-
 
 module.exports = {
     BattleshipInputGenerator,
