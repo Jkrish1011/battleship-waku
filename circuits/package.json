@@ -11,6 +11,7 @@
     "generate-input": "node test/inputGenerator.js",
     "testMerkleTree": "node test/testMerkleTree.js",
     "generateBoardCommitment": "node test/generateBoardCommitment.js",
+    "generateMove": "node test/moveGenerator.js",
     "deploy:local": "hardhat run scripts/deploy.js --network localhost",
 
     "circuit:compile": "npm run circuit:compile:ship && npm run circuit:compile:move && npm run circuit:compile:win",
@@ -29,13 +30,13 @@
     
     "circuit:witness": "npm run circuit:witness:ship && npm run circuit:witness:move && npm run circuit:witness:win",
     "circuit:witness:ship": "node build/ship_placement/ship_placement_js/generate_witness.js build/ship_placement/ship_placement_js/ship_placement.wasm inputs/ship_placement_input.json build/ship_placement/ship_placement_js/witness.wtns",
-    "circuit:witness:move": "node build/move_verification/move_verification_js/generate_witness.js build/move_verification/move_verification_js/move_verification.wasm inputs/move_verification_input.json build/move_verification/witness.wtns",
+    "circuit:witness:move": "node build/move_verification/move_verification_js/generate_witness.js build/move_verification/move_verification_js/move_verification.wasm inputs/move_verification_input.json build/move_verification/move_verification_js/witness.wtns",
     "circuit:witness:win": "node build/win_verification/win_verification_js/generate_witness.js build/win_verification/win_verification_js/win_verification.wasm inputs/win_verification_input.json build/win_verification/witness.wtns",
     "circuit:witness:merkletree": "node build/merkletree/merkletree_js/generate_witness.js build/merkletree/merkletree_js/merkletree.wasm inputs/merkletree_input.json build/merkletree/witness.wtns",
 
     "circuit:proof": "npm run circuit:proof:ship && npm run circuit:proof:move && npm run circuit:proof:win",
     "circuit:proof:ship": "snarkjs groth16 prove keys/ship_placement_final.zkey build/ship_placement/ship_placement_js/witness.wtns proofs/ship_proof.json proofs/ship_public.json",
-    "circuit:proof:move": "snarkjs groth16 prove keys/move_verification_final.zkey build/move_verification/witness.wtns proofs/move_proof.json proofs/move_public.json",
+    "circuit:proof:move": "snarkjs groth16 prove keys/move_verification_final.zkey build/move_verification/move_verification_js/witness.wtns proofs/move_proof.json proofs/move_public.json",
     "circuit:proof:win": "snarkjs groth16 prove keys/win_verification_final.zkey build/win_verification/witness.wtns proofs/win_proof.json proofs/win_public.json",
     "circuit:proof:merkletree": "snarkjs groth16 prove keys/merkletree_final.zkey build/merkletree/witness.wtns proofs/merkletree_proof.json proofs/merkletree_public.json",
 

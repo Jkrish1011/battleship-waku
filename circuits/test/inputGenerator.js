@@ -85,7 +85,7 @@ class BattleshipInputGenerator {
         return currentLevel[0];
     }
 
-    async generateCorrectInput(ships) {
+    async generateCorrectInput(ships, salt = null) {
     
         let boardState = Array(100).fill(0);
         const shipSizes = [3, 3, 2, 2, 2];
@@ -134,15 +134,19 @@ class BattleshipInputGenerator {
     
         console.log(`\nTotal ships: ${totalShips}, Expected: ${expectedTotal}`);
 
-        const salt = this.generateSalt();
+        let currentSalt = salt;
+        if (currentSalt === null) {
+            currentSalt = this.generateSalt();
+        }
+        console.log("Salt: ", currentSalt.toString());
     
         const merkleRoot = await this.calculateMerkleRoot(boardState);
-        const commitment = await this.calculateCommitment(merkleRoot, salt);
+        const commitment = await this.calculateCommitment(merkleRoot, currentSalt);
         
         const input = {
             ships: ships,
             board_state: boardState,
-            salt: salt.toString(),
+            salt: currentSalt.toString(),
             commitment: commitment.toString(), 
             merkle_root: merkleRoot.toString()
         };
@@ -232,11 +236,11 @@ if (require.main === module) {
         console.log("\n" + "=".repeat(50));
 
         const yourShips = [
-            [3, 1, 3, 0], // Ship 1: horizontal 3-length at (1,1)
-            [5, 4, 3, 1], // Ship 2: vertical 3-length at (3,2) 
-            [7, 5, 2, 0], // Ship 3: horizontal 2-length at (5,5)
-            [1, 8, 2, 1], // Ship 4: vertical 2-length at (7,2)
-            [8, 8, 2, 0]  // Ship 5: horizontal 2-length at (0,8)
+            [3, 1, 3, 0], // Ship 1: Vertical 3-length at (1,1)
+            [5, 4, 3, 1], // Ship 2: Horizontal 3-length at (3,2) 
+            [7, 5, 2, 0], // Ship 3: Vertical 2-length at (5,5)
+            [1, 8, 2, 1], // Ship 4: Horizontal 2-length at (7,2)
+            [8, 8, 2, 0]  // Ship 5: Vertical 2-length at (0,8)
         ];
 
         const correctInput = await generator.generateCorrectInput(yourShips);

@@ -1,21 +1,20 @@
 pragma circom 2.0.0;
 
 include "circomlib/circuits/comparators.circom";
-include "circomlib/circuits/pedersen.circom";
+include "circomlib/circuits/poseidon.circom";
 include "circomlib/circuits/multiplexer.circom";
+include "circomlib/circuits/binsum.circom";  // For Num2Bits
 include "./merkletree.circom";
 
 template RangeCheck(n) {
     signal input in;
     signal output out;
     
-    // Use constraint-based validation instead of assert
-    component lt = LessThan(8); // 8 bits is enough for values 0-99
+    component lt = LessThan(8);
     lt.in[0] <== in;
     lt.in[1] <== n;
     lt.out === 1;
     
-    // Also ensure non-negative (though this is implicit with LessThan from 0)
     component gte = GreaterEqThan(8);
     gte.in[0] <== in;
     gte.in[1] <== 0;
@@ -25,32 +24,38 @@ template RangeCheck(n) {
 }
 
 template MoveVerification() {
-    signal input board_state[100]; // Private: 10x10 grid
-    signal input guess_x; // Private 
-    signal input guess_y; // Private 
-    signal input salt; // Private: Blinding factor for the merkle tree
+    signal input board_state[100];
+    signal input guess_x;
+    signal input guess_y;
+    signal input salt;
 
-    signal input commitment; // public: Pedersen Commitment
-    signal input merkle_root; // Public: Merkle Root of the board state
-    signal input hit; // public: 1 if hit, 0 if miss
+    signal input commitment;
+    signal input merkle_root;
+    signal input hit;
 
-    // Validate guess coordinates are within bounds (0-9)
+    // Validate guess coordinates
     component x_check = RangeCheck(10);
     x_check.in <== guess_x; 
     
     component y_check = RangeCheck(10);
     y_check.in <== guess_y; 
 
-    // Validate each board cell is binary (0 or 1)
+
+    // Validate board cells are binary
     for (var i = 0; i < 100; i++) {
         board_state[i] * (board_state[i] - 1) === 0;
     }
 
     // Calculate the 1D index from 2D coordinates
-    signal guess_index <== guess_x * 10 + guess_y;
+    signal guess_index;
+    guess_index <== guess_x * 10 + guess_y;
     
-    // Calculate the hit result using multiplexer
-    component mux = Multiplexer(1, 100);  // 1-bit output, 100 possible positions
+    // Verify guess index is within range
+    component index_check = RangeCheck(100);
+    index_check.in <== guess_index;
+
+    // Use Multiplexer to verify hit result matches board state at guessed position
+    component mux = Multiplexer(1, 100); // 1-bit output, 100 possible positions
     
     // Connect all board positions to multiplexer inputs
     for (var i = 0; i < 100; i++) {
@@ -60,7 +65,7 @@ template MoveVerification() {
     // Connect the guess index as selector
     mux.sel <== guess_index;
     
-    // Get the result from multiplexer
+    // Get the result from multiplexer and verify it matches the hit signal
     signal hit_result;
     hit_result <== mux.out[0];
     
@@ -72,20 +77,16 @@ template MoveVerification() {
     for (var i = 0; i < 100; i++) {
         merkle.leaves[i] <== board_state[i];
     }
-    // Pad remaining leaves with zeros for complete binary tree
     for (var i = 100; i < 128; i++) {
         merkle.leaves[i] <== 0;
     }
     merkle.root === merkle_root;
 
     // Verify commitment
-    component pedersen = Pedersen(101);
-    for (var i = 0; i < 100; i++) {
-        pedersen.in[i] <== board_state[i];
-    }
-    pedersen.in[100] <== salt;
-    commitment === pedersen.out[0];
+    component commitment_hash = Poseidon(2);
+    commitment_hash.inputs[0] <== merkle.root;
+    commitment_hash.inputs[1] <== salt;
+    commitment === commitment_hash.out;
 }
 
 component main {public [commitment, merkle_root, hit]} = MoveVerification();
-
