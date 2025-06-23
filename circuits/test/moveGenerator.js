@@ -19,10 +19,6 @@ class BattleshipMoveGenerator {
         this.gameStateGenerator.validateInput(ships, gameState.board_state);
         return gameState;
     }
-
-    async generateMove(gameState) {
-        
-    }
 }
 
 if (require.main === module) {
@@ -44,12 +40,12 @@ if (require.main === module) {
 
         const salt = BigInt("111932274919168185007333401134409959455837854918323534429202520910593105337309");
         const gameState = await moveGenerator.generateGameState(ships, salt);
-        const guess = [3,1];
+        const guess = [5,6];
         const commitment = gameState.commitment;
         const merkleRoot = gameState.merkle_root;
         const boardState = gameState.board_state;
         
-        const hit = 0;
+        const hit = 1;
 
         const moveJson = {
             salt: salt.toString(),

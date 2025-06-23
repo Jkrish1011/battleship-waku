@@ -1,7 +1,7 @@
 pragma circom 2.0.0;
 
 include "circomlib/circuits/comparators.circom";
-include "circomlib/circuits/pedersen.circom";
+include "circomlib/circuits/poseidon.circom";
 include "./merkletree.circom";
 
 template RangeCheck(n) {
@@ -27,7 +27,7 @@ template WinVerification() {
     signal input hits[12][2]; // Private: Array of 12 hits (x, y)
     signal input salt; // Private: Blinding factor for the merkle tree
 
-    signal input commitment; // public: Pedersen Commitment
+    signal input commitment; // public: Poseidon Commitment
     signal input merkle_root; // Public
     signal input hit_count; // Public
     
@@ -77,9 +77,7 @@ template WinVerification() {
         // Calculate 1D index from 2D coordinates
         hit_index[i] <== hits[i][0] * 10 + hits[i][1];
         
-        
         // Create selector array where only the target index is 1, others are 0
-        
         for (var j = 0; j < 100; j++) {
             index_equals[i][j] = IsEqual();
             index_equals[i][j].in[0] <== hit_index[i];
@@ -130,13 +128,11 @@ template WinVerification() {
 
     merkle.root === merkle_root;
 
-    // Verify Commitment
-    component pedersen = Pedersen(101);
-    for (var i = 0; i < 100; i++) {
-        pedersen.in[i] <== board_state[i];
-    }
-    pedersen.in[100] <== salt;
-    commitment === pedersen.out[0];
+    // Verify commitment
+    component commitment_hash = Poseidon(2);
+    commitment_hash.inputs[0] <== merkle.root;
+    commitment_hash.inputs[1] <== salt;
+    commitment === commitment_hash.out;
 }
 
 component main {public [commitment, merkle_root, hit_count]} = WinVerification();

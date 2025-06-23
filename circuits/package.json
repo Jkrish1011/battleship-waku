@@ -13,41 +13,37 @@
     "generateBoardCommitment": "node test/generateBoardCommitment.js",
     "generateMove": "node test/moveGenerator.js",
     "deploy:local": "hardhat run scripts/deploy.js --network localhost",
-
     "circuit:compile": "npm run circuit:compile:ship && npm run circuit:compile:move && npm run circuit:compile:win",
     "circuit:compile:ship": "circom circuits/ship_placement.circom --r1cs --wasm --sym -o build/ship_placement/",
     "circuit:compile:move": "circom circuits/move_verification.circom --r1cs --wasm --sym -o build/move_verification/",
     "circuit:compile:win": "circom circuits/win_verification.circom --r1cs --wasm --sym -o build/win_verification/",
     "circuit:compile:merkletree": "circom circuits/merkletree.circom --r1cs --wasm --sym -o build/merkletree/",
-
     "circuit:setup": "snarkjs powersoftau new bn128 18 pot18_0000.ptau -v && snarkjs powersoftau contribute pot18_0000.ptau pot18_0001.ptau --name='First contribution' -v && snarkjs powersoftau prepare phase2 pot18_0001.ptau pot18_final.ptau -v",
-
     "circuit:keys:ship": "snarkjs groth16 setup build/ship_placement/ship_placement.r1cs pot18_final.ptau keys/ship_placement_0000.zkey && snarkjs zkey contribute keys/ship_placement_0000.zkey keys/ship_placement_final.zkey --name='Ship Contributor' -v && snarkjs zkey export verificationkey keys/ship_placement_final.zkey keys/ship_verification_key.json",
     "circuit:keys:move": "snarkjs groth16 setup build/move_verification/move_verification.r1cs pot18_final.ptau keys/move_verification_0000.zkey && snarkjs zkey contribute keys/move_verification_0000.zkey keys/move_verification_final.zkey --name='Move Contributor' -v && snarkjs zkey export verificationkey keys/move_verification_final.zkey keys/move_verification_key.json",
     "circuit:keys:win": "snarkjs groth16 setup build/win_verification/win_verification.r1cs pot18_final.ptau keys/win_verification_0000.zkey && snarkjs zkey contribute keys/win_verification_0000.zkey keys/win_verification_final.zkey --name='Win Contributor' -v && snarkjs zkey export verificationkey keys/win_verification_final.zkey keys/win_verification_key.json",
     "circuit:keys:merkletree": "snarkjs groth16 setup build/merkletree/merkletree.r1cs pot18_final.ptau keys/merkletree_0000.zkey && snarkjs zkey contribute keys/merkletree_0000.zkey keys/merkletree_final.zkey --name='Merkle Tree Contributor' -v && snarkjs zkey export verificationkey keys/merkletree_final.zkey keys/merkletree_verification_key.json",
     "circuit:keys": "npm run circuit:keys:ship && npm run circuit:keys:move && npm run circuit:keys:win",
-    
     "circuit:witness": "npm run circuit:witness:ship && npm run circuit:witness:move && npm run circuit:witness:win",
     "circuit:witness:ship": "node build/ship_placement/ship_placement_js/generate_witness.js build/ship_placement/ship_placement_js/ship_placement.wasm inputs/ship_placement_input.json build/ship_placement/ship_placement_js/witness.wtns",
     "circuit:witness:move": "node build/move_verification/move_verification_js/generate_witness.js build/move_verification/move_verification_js/move_verification.wasm inputs/move_verification_input.json build/move_verification/move_verification_js/witness.wtns",
-    "circuit:witness:win": "node build/win_verification/win_verification_js/generate_witness.js build/win_verification/win_verification_js/win_verification.wasm inputs/win_verification_input.json build/win_verification/witness.wtns",
+    "circuit:witness:win": "node build/win_verification/win_verification_js/generate_witness.js build/win_verification/win_verification_js/win_verification.wasm inputs/win_verification_input.json build/win_verification/win_verification_js/witness.wtns",
     "circuit:witness:merkletree": "node build/merkletree/merkletree_js/generate_witness.js build/merkletree/merkletree_js/merkletree.wasm inputs/merkletree_input.json build/merkletree/witness.wtns",
-
     "circuit:proof": "npm run circuit:proof:ship && npm run circuit:proof:move && npm run circuit:proof:win",
     "circuit:proof:ship": "snarkjs groth16 prove keys/ship_placement_final.zkey build/ship_placement/ship_placement_js/witness.wtns proofs/ship_proof.json proofs/ship_public.json",
     "circuit:proof:move": "snarkjs groth16 prove keys/move_verification_final.zkey build/move_verification/move_verification_js/witness.wtns proofs/move_proof.json proofs/move_public.json",
-    "circuit:proof:win": "snarkjs groth16 prove keys/win_verification_final.zkey build/win_verification/witness.wtns proofs/win_proof.json proofs/win_public.json",
+    "circuit:proof:win": "snarkjs groth16 prove keys/win_verification_final.zkey build/win_verification/win_verification_js/witness.wtns proofs/win_proof.json proofs/win_public.json",
     "circuit:proof:merkletree": "snarkjs groth16 prove keys/merkletree_final.zkey build/merkletree/witness.wtns proofs/merkletree_proof.json proofs/merkletree_public.json",
-
     "circuit:verify:ship": "snarkjs groth16 verify keys/ship_verification_key.json proofs/ship_public.json proofs/ship_proof.json",
     "circuit:verify:move": "snarkjs groth16 verify keys/move_verification_key.json proofs/move_public.json proofs/move_proof.json",
     "circuit:verify:win": "snarkjs groth16 verify keys/win_verification_key.json proofs/win_public.json proofs/win_proof.json",
     "circuit:verify:merkletree": "snarkjs groth16 verify keys/merkletree_verification_key.json proofs/merkletree_public.json proofs/merkletree_proof.json",
-
+    "circuit:sc:ship": "snarkjs zkey export solidityverifier keys/ship_placement_final.zkey contracts/ship_placement.sol",
+    "circuit:sc:move": "snarkjs zkey export solidityverifier keys/move_verification_final.zkey contracts/move_verification.sol",
+    "circuit:sc:win": "snarkjs zkey export solidityverifier keys/win_verification_final.zkey contracts/win_verification.sol",
+    "circuit:sc:merkletree": "snarkjs zkey export solidityverifier keys/merkletree_final.zkey contracts/merkletree.sol",
     "circuit:clean": "rm -rf build/ keys/ proofs/ *.ptau"
-
-  }, 
+  },
   "keywords": [
     "circom",
     "hardhat",
@@ -59,13 +55,25 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
+    "@nomicfoundation/hardhat-chai-matchers": "^2.0.9",
+    "@nomicfoundation/hardhat-ethers": "^3.0.9",
+    "@nomicfoundation/hardhat-ignition": "^0.15.11",
+    "@nomicfoundation/hardhat-ignition-ethers": "^0.15.12",
+    "@nomicfoundation/hardhat-network-helpers": "^1.0.12",
     "@nomicfoundation/hardhat-toolbox": "^5.0.0",
     "@nomicfoundation/hardhat-verify": "^2.0.14",
+    "@nomicfoundation/ignition-core": "^0.15.11",
     "@openzeppelin/hardhat-upgrades": "^3.9.0",
+    "@typechain/ethers-v6": "^0.5.1",
+    "@typechain/hardhat": "^9.1.0",
+    "@types/chai": "^4.3.20",
+    "@types/mocha": "^10.0.10",
     "hardhat": "^2.24.3",
     "hardhat-circom": "^3.3.2",
     "hardhat-gas-reporter": "^2.3.0",
-    "solidity-coverage": "^0.8.16"
+    "solidity-coverage": "^0.8.16",
+    "ts-node": "^10.9.2",
+    "typechain": "^8.3.2"
   },
   "dependencies": {
     "@openzeppelin/contracts": "^5.3.0",

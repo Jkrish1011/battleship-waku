@@ -6,3 +6,8 @@ keys/
 pot*.ptau
 
 .env
+
+artifacts/build-info/
+artifacts/circom/
+
+cache/
