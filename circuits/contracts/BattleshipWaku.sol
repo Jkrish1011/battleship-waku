@@ -1,23 +1,49 @@
 //SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 
 import "./ship_placement.sol";
+import "./move_verification.sol";
+import "./win_verification.sol";
 
 interface IShipPlacementVerifier {
     function verifyProof(uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[2] calldata _pubSignals) external view returns (bool);
 }
 
+interface IMoveVerifier {
+    function verifyProof(uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[3] calldata _pubSignals) external view returns (bool);
+}
+
+interface IWinVerifier {
+    function verifyProof(uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[3] calldata _pubSignals) external view returns (bool);
+}
+
 contract BattleshipWaku is Ownable {
 
     IShipPlacementVerifier public immutable shipPlacementVerifier;
+    IMoveVerifier public immutable moveVerifier;
+    IWinVerifier public immutable winVerifier;
 
     struct ShipPlacementProof {
         uint[2] pA;
         uint[2][2] pB;
         uint[2] pC;
         uint[2] pubSignals;
+    }
+
+    struct MoveProof {
+        uint[2] pA;
+        uint[2][2] pB;
+        uint[2] pC;
+        uint[3] pubSignals;
+    }
+
+    struct WinProof {
+        uint[2] pA;
+        uint[2][2] pB;
+        uint[2] pC;
+        uint[3] pubSignals;
     }
 
     struct Game {
@@ -37,8 +63,10 @@ contract BattleshipWaku is Ownable {
 
     event MoveMade(uint256 gameId, address player);
     
-    constructor(address _shipPlacementVerifier) Ownable(msg.sender) {
+    constructor(address _shipPlacementVerifier, address _moveVerifier, address _winVerifier) Ownable(msg.sender) {
         shipPlacementVerifier = IShipPlacementVerifier(_shipPlacementVerifier);
+        moveVerifier = IMoveVerifier(_moveVerifier);
+        winVerifier = IWinVerifier(_winVerifier);
     }
 
     function createGame(
@@ -63,6 +91,13 @@ contract BattleshipWaku is Ownable {
 
         games[gameId] = newGame;
         // Verify the ship placement is valid using ship_placement.circom
+
+        bool isShipPlacementValid1 = shipPlacementVerifier.verifyProof(shipPlacementProofPlayer1.pA, shipPlacementProofPlayer1.pB, shipPlacementProofPlayer1.pC, shipPlacementProofPlayer1.pubSignals);
+        bool isShipPlacementValid2 = shipPlacementVerifier.verifyProof(shipPlacementProofPlayer2.pA, shipPlacementProofPlayer2.pB, shipPlacementProofPlayer2.pC, shipPlacementProofPlayer2.pubSignals);
+        require(isShipPlacementValid1, "Player 1 ship placement proof is invalid");
+        require(isShipPlacementValid2, "Player 2 ship placement proof is invalid");
+
+
         emit GameCreated(gameId, player1, player2, shipPlacementProofPlayer1.pubSignals[0], 
             shipPlacementProofPlayer1.pubSignals[1], shipPlacementProofPlayer2.pubSignals[0], 
             shipPlacementProofPlayer2.pubSignals[1]);
@@ -80,20 +115,24 @@ contract BattleshipWaku is Ownable {
         return (games[gameId].player1, games[gameId].player2);
     }
 
-    function makeMove(uint256 gameId, uint256 x, uint256 y) external {
+    function makeMove(uint256 gameId, MoveProof memory moveProof) external view returns (bool) {
         require(games[gameId].isActive, "Game is not active");
         require(games[gameId].playerTurn == msg.sender, "Not your turn");
 
         // Verify the move is valid using move_verification.circom
+        bool isMoveValid = moveVerifier.verifyProof(moveProof.pA, moveProof.pB, moveProof.pC, moveProof.pubSignals);
+        require(isMoveValid, "Move proof is invalid");
+
+        return isMoveValid;
     }
 
 
-    function winVerification(uint256 gameId) external {
+    function winVerification(uint256 gameId, WinProof memory winProof) external view returns (bool) {
         require(games[gameId].isActive, "Game is not active");
         // Verify the move is valid using win_verification.circom
+        bool isWinValid = winVerifier.verifyProof(winProof.pA, winProof.pB, winProof.pC, winProof.pubSignals);
+        require(isWinValid, "Win proof is invalid");
 
-
+        return isWinValid;
     }
-    
-
 }
