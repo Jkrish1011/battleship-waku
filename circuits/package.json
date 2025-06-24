@@ -62,6 +62,7 @@
     "@openzeppelin/contracts": "^5.3.0",
     "circomlibjs": "^0.1.7",
     "crypto": "^1.0.1",
-    "ethers": "^6.14.3"
+    "ethers": "^6.14.3",
+    "snarkjs": "^0.7.5"
   }
 }

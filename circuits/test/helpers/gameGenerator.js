@@ -1,5 +1,6 @@
 const crypto = require("crypto");
 const { buildPoseidon } = require("circomlibjs");
+const snarkjs = require("snarkjs");
 
 class BattleshipGameGenerator {
     constructor() {
@@ -94,7 +95,7 @@ class BattleshipGameGenerator {
     
         ships.forEach((ship, shipIndex) => {
             const [x, y, length, orientation] = ship;
-            console.log(`Ship ${shipIndex + 1}: [${x}, ${y}, ${length}, ${orientation}]`);
+            // console.log(`Ship ${shipIndex + 1}: [${x}, ${y}, ${length}, ${orientation}]`);
             
             let positions = [];
     
@@ -108,16 +109,16 @@ class BattleshipGameGenerator {
                     positions.push(`(${cellX}, ${cellY})`);
                 }
             }
-            console.log(` Positions: ${positions.join(", ")}`);
+            // console.log(` Positions: ${positions.join(", ")}`);
         });
     
-        console.log("\n Generated Board state");
-        console.log(`const boardState = [`);
-        for (let row = 0; row < 10; row++) {
-            const rowData = boardState.slice(row * 10, (row + 1) * 10);
-            console.log(`  ${rowData.join(',')}, // Row ${row}`);
-        }
-        console.log("];");
+        // console.log("\n Generated Board state");
+        // console.log(`const boardState = [`);
+        // for (let row = 0; row < 10; row++) {
+        //     const rowData = boardState.slice(row * 10, (row + 1) * 10);
+        //     console.log(`  ${rowData.join(',')}, // Row ${row}`);
+        // }
+        // console.log("];");
     
         console.log("\nBoard visualization:");
         for (let row = 0; row < 10; row++) {
@@ -132,7 +133,7 @@ class BattleshipGameGenerator {
         const totalShips = boardState.reduce((sum, cell) => sum + cell, 0);
         const expectedTotal = this.shipSizes.reduce((sum, size) => sum + size, 0);
     
-        console.log(`\nTotal ships: ${totalShips}, Expected: ${expectedTotal}`);
+        // console.log(`\nTotal ships: ${totalShips}, Expected: ${expectedTotal}`);
 
         let currentSalt = salt;
         if (currentSalt === null) {
@@ -238,6 +239,11 @@ class BattleshipGameGenerator {
         } else {
             console.log("\nValidation successful!");
         }
+    }
+
+    async generateProof(input, wasmContent, zkeyContent) {
+        const proof = await snarkjs.groth16.fullProve(input, wasmContent, zkeyContent);
+        return proof;
     }
 }
 
