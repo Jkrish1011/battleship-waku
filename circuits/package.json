@@ -8,10 +8,10 @@
     "test": "hardhat test",
     "node": "hardhat node",
     "deploy": "hardhat run scripts/deploy.js",
-    "generate-input": "node test/inputGenerator.js",
-    "testMerkleTree": "node test/testMerkleTree.js",
-    "generateBoardCommitment": "node test/generateBoardCommitment.js",
-    "generateMove": "node test/moveGenerator.js",
+    "generate-input": "node scripts/inputGenerator.js",
+    "testMerkleTree": "node scripts/testMerkleTree.js",
+    "generateBoardCommitment": "node scripts/generateBoardCommitment.js",
+    "generateMove": "node scripts/moveGenerator.js",
     "deploy:local": "hardhat run scripts/deploy.js --network localhost",
     "circuit:compile": "npm run circuit:compile:ship && npm run circuit:compile:move && npm run circuit:compile:win",
     "circuit:compile:ship": "circom circuits/ship_placement.circom --r1cs --wasm --sym -o build/ship_placement/",
@@ -55,30 +55,13 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "@nomicfoundation/hardhat-chai-matchers": "^2.0.9",
-    "@nomicfoundation/hardhat-ethers": "^3.0.9",
-    "@nomicfoundation/hardhat-ignition": "^0.15.11",
-    "@nomicfoundation/hardhat-ignition-ethers": "^0.15.12",
-    "@nomicfoundation/hardhat-network-helpers": "^1.0.12",
     "@nomicfoundation/hardhat-toolbox": "^5.0.0",
-    "@nomicfoundation/hardhat-verify": "^2.0.14",
-    "@nomicfoundation/ignition-core": "^0.15.11",
-    "@openzeppelin/contracts": "^5.3.0",
-    "@openzeppelin/hardhat-upgrades": "^3.9.0",
-    "@typechain/ethers-v6": "^0.5.1",
-    "@typechain/hardhat": "^9.1.0",
-    "@types/chai": "^4.3.20",
-    "@types/mocha": "^10.0.10",
-    "hardhat": "^2.24.3",
-    "hardhat-circom": "^3.3.2",
-    "hardhat-gas-reporter": "^2.3.0",
-    "solidity-coverage": "^0.8.16",
-    "ts-node": "^10.9.2",
-    "typechain": "^8.3.2"
+    "hardhat": "^2.24.1"
   },
   "dependencies": {
     "@openzeppelin/contracts": "^5.3.0",
     "circomlibjs": "^0.1.7",
-    "snarkjs": "^0.7.5"
+    "crypto": "^1.0.1",
+    "ethers": "^6.14.3"
   }
 }
