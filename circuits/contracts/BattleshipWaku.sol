@@ -93,10 +93,9 @@ contract BattleshipWaku is Ownable {
         // Verify the ship placement is valid using ship_placement.circom
 
         bool isShipPlacementValid1 = shipPlacementVerifier.verifyProof(shipPlacementProofPlayer1.pA, shipPlacementProofPlayer1.pB, shipPlacementProofPlayer1.pC, shipPlacementProofPlayer1.pubSignals);
-        bool isShipPlacementValid2 = shipPlacementVerifier.verifyProof(shipPlacementProofPlayer2.pA, shipPlacementProofPlayer2.pB, shipPlacementProofPlayer2.pC, shipPlacementProofPlayer2.pubSignals);
         require(isShipPlacementValid1, "Player 1 ship placement proof is invalid");
+        bool isShipPlacementValid2 = shipPlacementVerifier.verifyProof(shipPlacementProofPlayer2.pA, shipPlacementProofPlayer2.pB, shipPlacementProofPlayer2.pC, shipPlacementProofPlayer2.pubSignals);
         require(isShipPlacementValid2, "Player 2 ship placement proof is invalid");
-
 
         emit GameCreated(gameId, player1, player2, shipPlacementProofPlayer1.pubSignals[0], 
             shipPlacementProofPlayer1.pubSignals[1], shipPlacementProofPlayer2.pubSignals[0], 

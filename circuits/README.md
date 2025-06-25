@@ -22,3 +22,10 @@ snarkjs zkey contribute battleship_0000.zkey battleship_final.zkey
 # Export verification key
 snarkjs zkey export verificationkey battleship_final.zkey verification_key.json
 ```
+
+Generate call parameters for Verifier Contracts
+
+Example:
+```
+snarkjs zkey export soliditycalldata ./proofs/ship_public.json ./proofs/ship_proof.json
+```

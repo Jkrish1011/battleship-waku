@@ -173,7 +173,6 @@ class BattleshipGameGenerator {
             positions.push([x, y, length, orientation]);
         }
         const correctInput = await this.generateCorrectInput(positions);
-        this.validateInput(positions, correctInput.board_state);
         return correctInput;
     }
     
@@ -221,6 +220,12 @@ class BattleshipGameGenerator {
                 }
             }
         });
+
+        if (issues.length > 0) {
+            console.log("\nValidation issues:");
+            issues.forEach((issue) => console.log(`- ${issue}`));
+            return false;
+        }
         
         // Compare expectedBoard with boardState
         let mismatches = 0;
@@ -236,14 +241,38 @@ class BattleshipGameGenerator {
         if (issues.length > 0) {
             console.log("\nValidation issues:");
             issues.forEach((issue) => console.log(`- ${issue}`));
+            return false;
         } else {
             console.log("\nValidation successful!");
+            return true;
         }
     }
 
+    buffer32BytesToBigIntBE(buf) {
+        return (
+          (buf.readBigUInt64BE(0) << 192n) +
+          (buf.readBigUInt64BE(8) << 128n) +
+          (buf.readBigUInt64BE(16) << 64n) +
+          buf.readBigUInt64BE(24)
+        );
+    }
+
+    randomBytesCrypto(len) {
+        if (len > 32) throw new Error("Length must be ≤ 32 for uint256 compatibility");
+        const bytes = new Uint8Array(crypto.randomBytes(len));
+        const buffer = Buffer.from(bytes);
+        return this.buffer32BytesToBigIntBE(buffer);
+    }
+    
     async generateProof(input, wasmContent, zkeyContent) {
         const proof = await snarkjs.groth16.fullProve(input, wasmContent, zkeyContent);
-        return proof;
+        const calldataStr = await snarkjs.groth16.exportSolidityCallData(proof.proof, proof.publicSignals);
+        const calldata = JSON.parse("[" + calldataStr + "]");
+        return calldata;
+    }
+
+    toHex(decimal) {
+        return '0x' + BigInt(decimal).toString(16);
     }
 }
 
