@@ -95,9 +95,6 @@ class BattleshipGameGenerator {
     
         ships.forEach((ship, shipIndex) => {
             const [x, y, length, orientation] = ship;
-            // console.log(`Ship ${shipIndex + 1}: [${x}, ${y}, ${length}, ${orientation}]`);
-            
-            let positions = [];
     
             for (let i = 0; i < length; i++) {
                 const cellX = x + ((1 - orientation) * i);
@@ -106,10 +103,8 @@ class BattleshipGameGenerator {
     
                 if (cellIndex >= 0 && cellIndex < 100) {
                     boardState[cellIndex] = 1;
-                    positions.push(`(${cellX}, ${cellY})`);
                 }
             }
-            // console.log(` Positions: ${positions.join(", ")}`);
         });
     
         // console.log("\n Generated Board state");
@@ -130,8 +125,8 @@ class BattleshipGameGenerator {
             console.log(rowStr);
         }
     
-        const totalShips = boardState.reduce((sum, cell) => sum + cell, 0);
-        const expectedTotal = this.shipSizes.reduce((sum, size) => sum + size, 0);
+        // const totalShips = boardState.reduce((sum, cell) => sum + cell, 0);
+        // const expectedTotal = this.shipSizes.reduce((sum, size) => sum + size, 0);
     
         // console.log(`\nTotal ships: ${totalShips}, Expected: ${expectedTotal}`);
 
@@ -158,8 +153,26 @@ class BattleshipGameGenerator {
         return input;
     }
 
-    async generateShipPlacementPositions() {
+    calculateShipPositions(ships) {
         let positions = [];
+        ships.forEach((ship) => {
+            const [x, y, length, orientation] = ship;
+
+            for (let i = 0; i < length; i++) {
+                const cellX = x + ((1 - orientation) * i);
+                const cellY = y + (orientation * i);
+                const cellIndex = cellX * 10 + cellY;
+    
+                if (cellIndex >= 0 && cellIndex < 100) {
+                    positions.push([cellX, cellY]);
+                }
+            }
+        });
+        return positions;
+    }
+
+    generateRandomShipPositions() {
+        let shipPositions = [];
 
         for (let i = 0; i < this.shipSizes.length; i++) {
             const length = this.shipSizes[i];
@@ -170,9 +183,13 @@ class BattleshipGameGenerator {
                 x = Math.floor(Math.random() * 10);
                 y = Math.floor(Math.random() * 10);
             }
-            positions.push([x, y, length, orientation]);
+            shipPositions.push([x, y, length, orientation]);
         }
-        const correctInput = await this.generateCorrectInput(positions);
+        return shipPositions;
+    }
+
+    async generateShipPlacementPositions(shipPositions) {
+        const correctInput = await this.generateCorrectInput(shipPositions);
         return correctInput;
     }
     
@@ -241,9 +258,11 @@ class BattleshipGameGenerator {
         if (issues.length > 0) {
             console.log("\nValidation issues:");
             issues.forEach((issue) => console.log(`- ${issue}`));
+            console.log("returning false");
             return false;
         } else {
             console.log("\nValidation successful!");
+            console.log("returning true");
             return true;
         }
     }
