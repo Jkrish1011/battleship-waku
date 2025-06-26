@@ -52,6 +52,25 @@ contract BattleshipWaku is Ownable {
         address player2;
         bool isActive;
         address playerTurn;
+        bytes32 player1_board_commitment;
+        bytes32 player1_merkle_root;
+        bytes32 player2_board_commitment;
+        bytes32 player2_merkle_root;
+        mapping(address => uint8) player_hits;
+        ShipPlacementProof player1ShipPlacementProof;
+        ShipPlacementProof player2ShipPlacementProof;
+    }
+
+    struct GameView {
+         uint256 gameId;
+        address player1;
+        address player2;
+        bool isActive;
+        address playerTurn;
+        bytes32 player1_board_commitment;
+        bytes32 player1_merkle_root;
+        bytes32 player2_board_commitment;
+        bytes32 player2_merkle_root;
         ShipPlacementProof player1ShipPlacementProof;
         ShipPlacementProof player2ShipPlacementProof;
     }
@@ -61,7 +80,8 @@ contract BattleshipWaku is Ownable {
     event GameCreated(uint256 indexed gameId, address player1, address player2, uint256 player1BoardCommitment, 
         uint256 player1MerkleRoot, uint256 player2BoardCommitment, uint256 player2MerkleRoot);
 
-    event MoveMade(uint256 gameId, address player);
+    event MoveMade(uint256 indexedgameId, address player);
+    event GameEnded(uint256 indexed gameId, address winner);
     
     constructor(address _shipPlacementVerifier, address _moveVerifier, address _winVerifier) Ownable(msg.sender) {
         shipPlacementVerifier = IShipPlacementVerifier(_shipPlacementVerifier);
@@ -72,38 +92,57 @@ contract BattleshipWaku is Ownable {
     function createGame(
         address player1, 
         address player2, 
-        ShipPlacementProof memory shipPlacementProofPlayer1,
-        ShipPlacementProof memory shipPlacementProofPlayer2,
+        ShipPlacementProof calldata shipPlacementProofPlayer1,
+        ShipPlacementProof calldata shipPlacementProofPlayer2,
         uint256 gameId) external onlyOwner {
         require(player1 != address(0) && player2 != address(0), "Invalid player addresses");
         require(player1 != player2, "Players cannot be the same");
         require(games[gameId].isActive == false, "Game already exists");
 
-        Game memory newGame = Game({
-            gameId: gameId,
-            player1: player1,
-            player2: player2,
-            isActive: true,
-            playerTurn: player1,
-            player1ShipPlacementProof: shipPlacementProofPlayer1,
-            player2ShipPlacementProof: shipPlacementProofPlayer2
-        });
-
-        games[gameId] = newGame;
         // Verify the ship placement is valid using ship_placement.circom
-
         bool isShipPlacementValid1 = shipPlacementVerifier.verifyProof(shipPlacementProofPlayer1.pA, shipPlacementProofPlayer1.pB, shipPlacementProofPlayer1.pC, shipPlacementProofPlayer1.pubSignals);
         require(isShipPlacementValid1, "Player 1 ship placement proof is invalid");
         bool isShipPlacementValid2 = shipPlacementVerifier.verifyProof(shipPlacementProofPlayer2.pA, shipPlacementProofPlayer2.pB, shipPlacementProofPlayer2.pC, shipPlacementProofPlayer2.pubSignals);
         require(isShipPlacementValid2, "Player 2 ship placement proof is invalid");
+
+        // Create a new game
+        Game storage newGame = games[gameId];
+        newGame.gameId = gameId;
+        newGame.player1 = player1;
+        newGame.player2 = player2;
+        newGame.isActive = true;
+        newGame.playerTurn = player1;
+        newGame.player1_board_commitment = bytes32(shipPlacementProofPlayer1.pubSignals[0]);
+        newGame.player1_merkle_root = bytes32(shipPlacementProofPlayer1.pubSignals[1]);
+        newGame.player2_board_commitment = bytes32(shipPlacementProofPlayer2.pubSignals[0]);
+        newGame.player2_merkle_root = bytes32(shipPlacementProofPlayer2.pubSignals[1]);
+        newGame.player1ShipPlacementProof = shipPlacementProofPlayer1;
+        newGame.player2ShipPlacementProof = shipPlacementProofPlayer2;
+        newGame.player_hits[player1] = 0;
+        newGame.player_hits[player2] = 0;
 
         emit GameCreated(gameId, player1, player2, shipPlacementProofPlayer1.pubSignals[0], 
             shipPlacementProofPlayer1.pubSignals[1], shipPlacementProofPlayer2.pubSignals[0], 
             shipPlacementProofPlayer2.pubSignals[1]);
     }
 
-    function getGame(uint256 gameId) external view returns (Game memory) {
-        return games[gameId];
+    function getGame(uint256 gameId) external view returns (GameView memory gameData, uint8 player1Hits, uint8 player2Hits) {
+        Game storage game = games[gameId];
+        gameData = GameView({
+            gameId: game.gameId,
+            player1: game.player1,
+            player2: game.player2,
+            isActive: game.isActive,
+            playerTurn: game.playerTurn,
+            player1_board_commitment: game.player1_board_commitment,
+            player1_merkle_root: game.player1_merkle_root,
+            player2_board_commitment: game.player2_board_commitment,
+            player2_merkle_root: game.player2_merkle_root,
+            player1ShipPlacementProof: game.player1ShipPlacementProof,
+            player2ShipPlacementProof: game.player2ShipPlacementProof
+        });
+        player1Hits = game.player_hits[game.player1];
+        player2Hits = game.player_hits[game.player2];
     }
 
     function getGameStatus(uint256 gameId) external view returns (bool) {
@@ -114,23 +153,39 @@ contract BattleshipWaku is Ownable {
         return (games[gameId].player1, games[gameId].player2);
     }
 
-    function makeMove(uint256 gameId, MoveProof memory moveProof) external view returns (bool) {
+    function makeMove(uint256 gameId, MoveProof memory moveProof) external returns (bool) {
         require(games[gameId].isActive, "Game is not active");
         require(games[gameId].playerTurn == msg.sender, "Not your turn");
+        Game storage game = games[gameId];
 
         // Verify the move is valid using move_verification.circom
         bool isMoveValid = moveVerifier.verifyProof(moveProof.pA, moveProof.pB, moveProof.pC, moveProof.pubSignals);
         require(isMoveValid, "Move proof is invalid");
 
+        // Update the game state
+        game.player_hits[game.playerTurn]++;
+        game.playerTurn = game.playerTurn == game.player1 ? game.player2 : game.player1;
+
+        // Emit the move event
+        emit MoveMade(gameId, msg.sender);
         return isMoveValid;
     }
 
-
-    function winVerification(uint256 gameId, WinProof memory winProof) external view returns (bool) {
+    function winVerification(uint256 gameId, WinProof memory winProof) external returns (bool) {
         require(games[gameId].isActive, "Game is not active");
         // Verify the move is valid using win_verification.circom
         bool isWinValid = winVerifier.verifyProof(winProof.pA, winProof.pB, winProof.pC, winProof.pubSignals);
         require(isWinValid, "Win proof is invalid");
+
+        Game storage game = games[gameId];
+
+        // Update the game state
+        game.isActive = false;
+
+        address winner = game.player_hits[game.player1] == 12 ? game.player1 : game.player2;
+
+        // Emit the game ended event
+        emit GameEnded(gameId, winner);
 
         return isWinValid;
     }

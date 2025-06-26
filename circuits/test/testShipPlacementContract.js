@@ -107,7 +107,9 @@ describe("BattleshipWakuGame", function () {
     console.log("result2", result2);
 
     const shipPlacementProofPlayer1 = await battleshipWaku.createGame(player1Address, player2Address, proofPlayer1_converted, proofPlayer2_converted, gameId);
-    console.log("shipPlacementProofPlayer1", shipPlacementProofPlayer1);
+    console.log("shipPlacementProofPlayer1", shipPlacementProofPlayer1.hash);
+
+    
     
   });
 
