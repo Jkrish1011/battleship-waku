@@ -45,7 +45,7 @@ describe("BattleshipWakuGame", function () {
   });
 
   it.only("Create game", async function () {
-    const { battleshipWaku, player1, player2, gameGenerator, gameId, shipPlacementVerifier } = await loadFixture(deployWordleAppFixture);
+    const { battleshipWaku, player1, player2, gameGenerator, gameId, shipPlacementVerifier, moveVerifier } = await loadFixture(deployWordleAppFixture);
     console.log("gameId", gameId);
     const player1Address = player1.address;
     const player2Address = player2.address;
@@ -78,10 +78,10 @@ describe("BattleshipWakuGame", function () {
     }
     console.log("wasmPath", wasmPath);
     console.log("zkeyPath", zkeyPath);
-    const wasmBuffer = fs.readFileSync(wasmPath);
-    const zkeyBuffer = fs.readFileSync(zkeyPath);
-    console.log("WASM buffer size:", wasmBuffer.length);
-    console.log("zkey buffer size:", zkeyBuffer.length);
+    // const wasmBuffer = fs.readFileSync(wasmPath);
+    // const zkeyBuffer = fs.readFileSync(zkeyPath);
+    // console.log("WASM buffer size:", wasmBuffer.length);
+    // console.log("zkey buffer size:", zkeyBuffer.length);
     console.log("--");
 
     const proofPlayer1 = await gameGenerator.generateProof(shipPlacementPositionsPlayer1, wasmPath, zkeyPath);
@@ -107,9 +107,61 @@ describe("BattleshipWakuGame", function () {
     console.log("result2", result2);
 
     const shipPlacementProofPlayer1 = await battleshipWaku.createGame(player1Address, player2Address, proofPlayer1_converted, proofPlayer2_converted, gameId);
-    console.log("shipPlacementProofPlayer1", shipPlacementProofPlayer1.hash);
+    console.log("createGame txHash: ", shipPlacementProofPlayer1.hash);
 
+    /*
+      Player 1 will make a move.
+      For the move, we need to get the boardstate and commitments of the player2's game board.
+
+      When Player 1 is making a move, his move is passed to player 2 in prod and player 2 will be executing this at his/her end.
+      and vise-versa for player 2.
+    */
+
+    const guessPlayer1 = [1, 1];
+    const hit = 1;
+    const moveWasmPath = path.join(__dirname, "..", "build", "move_verification", "move_verification_js", "move_verification.wasm");
+    const moveZkeyPath = path.join(__dirname, "..", "keys", "move_verification_final.zkey");
+    if (!fs.existsSync(moveWasmPath)) {
+      throw new Error(`WASM file not found at: ${moveWasmPath}`);
+    }
     
+    if (!fs.existsSync(moveZkeyPath)) {
+        throw new Error(`zkey file not found at: ${moveZkeyPath}`);
+    }
+    console.log("moveWasmPath", moveWasmPath);
+    console.log("zkemoveZkeyPathyPath", moveZkeyPath);
+
+    const moveInputPlayer1 = {
+      salt: shipPlacementPositionsPlayer2.salt,
+      commitment: shipPlacementPositionsPlayer2.commitment,
+      merkle_root: shipPlacementPositionsPlayer2.merkle_root,
+      board_state: shipPlacementPositionsPlayer2.board_state,
+      guess_x: guessPlayer1[0],
+      guess_y: guessPlayer1[1],
+      hit: hit
+    };
+    const proofMovePlayer1 = await gameGenerator.generateProof(moveInputPlayer1, moveWasmPath, moveZkeyPath);
+    // console.log(proofPlayer1);
+    const proofMovePlayer1_converted = {
+      pA: proofMovePlayer1[0],
+      pB: proofMovePlayer1[1],
+      pC: proofMovePlayer1[2],
+      pubSignals: proofMovePlayer1[3]
+    };
+   
+    console.log("proofMovePlayer1[3]", proofMovePlayer1[3]);
+    let resultMovePlayer1 = await moveVerifier.verifyProof(proofMovePlayer1_converted.pA, proofMovePlayer1_converted.pB, proofMovePlayer1_converted.pC, proofMovePlayer1_converted.pubSignals);
+    console.log("resultMovePlayer1", resultMovePlayer1);
+
+    // // Connect the contract to player1
+    // const battleshipWakuWithPlayer1 = battleshipWaku.connect(player1);
+    // const moveTxHash = await battleshipWakuWithPlayer1.makeMove(gameId, proofMovePlayer1_converted);
+    // console.log("makeMove txHash: ", moveTxHash);
+
+    // // get game state
+    // const gameState = await battleshipWaku.getGame(gameId);
+    // console.log("gameState", ...gameState);
+
     
   });
 

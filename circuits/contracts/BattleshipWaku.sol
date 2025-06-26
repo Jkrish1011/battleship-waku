@@ -154,16 +154,18 @@ contract BattleshipWaku is Ownable {
     }
 
     function makeMove(uint256 gameId, MoveProof memory moveProof) external returns (bool) {
-        require(games[gameId].isActive, "Game is not active");
-        require(games[gameId].playerTurn == msg.sender, "Not your turn");
         Game storage game = games[gameId];
+        require(game.isActive, "Game is not active");
+        require(game.playerTurn == msg.sender, "Not your turn");
 
         // Verify the move is valid using move_verification.circom
         bool isMoveValid = moveVerifier.verifyProof(moveProof.pA, moveProof.pB, moveProof.pC, moveProof.pubSignals);
         require(isMoveValid, "Move proof is invalid");
-
+        
         // Update the game state
-        game.player_hits[game.playerTurn]++;
+        /*
+            TODO: moveProof.pubSignals[2] is the hit value. So parse it and update the hit or miss value for the current player.
+        */
         game.playerTurn = game.playerTurn == game.player1 ? game.player2 : game.player1;
 
         // Emit the move event
@@ -172,12 +174,11 @@ contract BattleshipWaku is Ownable {
     }
 
     function winVerification(uint256 gameId, WinProof memory winProof) external returns (bool) {
-        require(games[gameId].isActive, "Game is not active");
+        Game storage game = games[gameId];
+        require(game.isActive, "Game is not active");
         // Verify the move is valid using win_verification.circom
         bool isWinValid = winVerifier.verifyProof(winProof.pA, winProof.pB, winProof.pC, winProof.pubSignals);
         require(isWinValid, "Win proof is invalid");
-
-        Game storage game = games[gameId];
 
         // Update the game state
         game.isActive = false;
