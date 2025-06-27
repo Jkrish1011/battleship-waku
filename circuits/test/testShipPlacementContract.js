@@ -4,6 +4,7 @@ const {
   loadFixture,
   time,
 } = require("@nomicfoundation/hardhat-toolbox/network-helpers");
+// const { deployProxy } = require("@openzeppelin/hardhat-upgrades");
 
 const { BattleshipGameGenerator } = require("./helpers/gameGenerator");
 const fs = require("fs");
@@ -24,8 +25,25 @@ describe("BattleshipWakuGame", function () {
     console.log("moveVerifier", moveVerifier.target);
     console.log("winVerifier", winVerifier.target);
     
-    const battleshipWaku = await hre.ethers.deployContract("BattleshipWaku", [shipPlacementVerifier.target, moveVerifier.target, winVerifier.target]);
+    // const battleshipWaku = await hre.ethers.deployContract("BattleshipWaku", [shipPlacementVerifier.target, moveVerifier.target, winVerifier.target]);
+    // const BattleshipWaku = await hre.ethers.getContractFactory("BattleshipWaku");
+    // const battleshipWaku = await deployProxy(BattleshipWaku, [shipPlacementVerifier.target, moveVerifier.target, winVerifier.target],{ initializer: "initialize" });
+    // console.log("BattleshipWaku", battleshipWaku.target);
+    const BattleshipWaku = await hre.ethers.getContractFactory("BattleshipWaku");
+    const battleshipWaku = await hre.upgrades.deployProxy(BattleshipWaku, [shipPlacementVerifier.target, moveVerifier.target, winVerifier.target],{ initializer: "initialize" });
     console.log("BattleshipWaku", battleshipWaku.target);
+
+    // Get the proxy address - for proxy deployments, use .target directly
+    const proxyAddress = battleshipWaku.target;
+    console.log("Proxy deployed to:", proxyAddress);
+
+    // Get the implementation address
+    const implementationAddress = await hre.upgrades.erc1967.getImplementationAddress(proxyAddress);
+    console.log("Implementation deployed to:", implementationAddress);
+
+    // Get the admin address
+    const adminAddress = await hre.upgrades.erc1967.getAdminAddress(proxyAddress);
+    console.log("Admin address:", adminAddress);
 
     return { shipPlacementVerifier, moveVerifier, winVerifier, owner, battleshipWaku, player1, player2, gameGenerator, gameId };
   }
@@ -241,7 +259,6 @@ describe("BattleshipWakuGame", function () {
     const winTxHash = await battleshipWakuWithPlayer1.winVerification(gameId, proofWinPlayer1_converted);
     console.log("winVerification txHash: ", winTxHash);
   });
-
 
   it.only("Win verification Failure", async function () {
     const { battleshipWaku, player1, player2, gameGenerator, gameId, shipPlacementVerifier, moveVerifier, winVerifier } = await loadFixture(deployWordleAppFixture);

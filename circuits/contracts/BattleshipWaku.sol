@@ -1,7 +1,8 @@
 //SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
 import "./ship_placement.sol";
 import "./move_verification.sol";
@@ -19,11 +20,11 @@ interface IWinVerifier {
     function verifyProof(uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[3] calldata _pubSignals) external view returns (bool);
 }
 
-contract BattleshipWaku is Ownable {
+contract BattleshipWaku is Initializable, OwnableUpgradeable {
 
-    IShipPlacementVerifier public immutable shipPlacementVerifier;
-    IMoveVerifier public immutable moveVerifier;
-    IWinVerifier public immutable winVerifier;
+    IShipPlacementVerifier public shipPlacementVerifier;
+    IMoveVerifier public moveVerifier;
+    IWinVerifier public winVerifier;
 
     struct ShipPlacementProof {
         uint[2] pA;
@@ -83,7 +84,13 @@ contract BattleshipWaku is Ownable {
     event MoveMade(uint256 indexedgameId, address player);
     event GameEnded(uint256 indexed gameId, address winner);
     
-    constructor(address _shipPlacementVerifier, address _moveVerifier, address _winVerifier) Ownable(msg.sender) {
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
+    function initialize(address _shipPlacementVerifier, address _moveVerifier, address _winVerifier) public initializer {
+        __Ownable_init(msg.sender);
         shipPlacementVerifier = IShipPlacementVerifier(_shipPlacementVerifier);
         moveVerifier = IMoveVerifier(_moveVerifier);
         winVerifier = IWinVerifier(_winVerifier);
