@@ -29,3 +29,16 @@ Example:
 ```
 snarkjs zkey export soliditycalldata ./proofs/ship_public.json ./proofs/ship_proof.json
 ```
+
+#### Run test cases
+
+```
+npx hardhat compile
+npx hardhat test
+```
+
+#### Run specific test cases
+
+```
+npx hardhat test --network localhost --grep "Win verification Failure"
+```
