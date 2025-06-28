@@ -3,6 +3,7 @@ pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
 import "./ship_placement.sol";
 import "./move_verification.sol";
@@ -20,7 +21,7 @@ interface IWinVerifier {
     function verifyProof(uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[3] calldata _pubSignals) external view returns (bool);
 }
 
-contract BattleshipWaku is Initializable, OwnableUpgradeable {
+contract BattleshipWaku is Initializable, OwnableUpgradeable, UUPSUpgradeable {
 
     IShipPlacementVerifier public shipPlacementVerifier;
     IMoveVerifier public moveVerifier;
@@ -91,6 +92,7 @@ contract BattleshipWaku is Initializable, OwnableUpgradeable {
 
     function initialize(address _shipPlacementVerifier, address _moveVerifier, address _winVerifier) public initializer {
         __Ownable_init(msg.sender);
+        __UUPSUpgradeable_init();
         shipPlacementVerifier = IShipPlacementVerifier(_shipPlacementVerifier);
         moveVerifier = IMoveVerifier(_moveVerifier);
         winVerifier = IWinVerifier(_winVerifier);
@@ -205,4 +207,6 @@ contract BattleshipWaku is Initializable, OwnableUpgradeable {
 
         return isWinValid;
     }
+
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 }
