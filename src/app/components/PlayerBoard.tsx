@@ -3,8 +3,9 @@ import React, { useState, useEffect } from "react";
 
 import { Player, Message } from "../types";
 
-import { BOARD_SIZE, createBoard, Ship, SHIPS, ChatMessage, MoveReplyMessage, ShipPlacement } from "../utils/gameUtils";
+import { BOARD_SIZE, createBoard, Ship, SHIPS, ChatMessage, MoveReplyMessage } from "../utils/gameUtils";
 import { useLightPush } from "@waku/react";
+import { BattleshipGameGenerator } from "./helpers/gameGenerator";
 
 function PlayerBoard(props: { 
   latestMessage?: Message,
@@ -15,6 +16,13 @@ function PlayerBoard(props: {
   encoder: any
 }) {
   const {node, encoder, isLoading, player, latestMessage} = props;
+  const [wasmBuffer, setWasmBuffer] = useState<Uint8Array|null>(null);
+  const [zkeyBuffer, setZkeyBuffer] = useState<Uint8Array|null>(null);
+
+  const [board, setBoard] = useState(createBoard());
+  const [selectedShip, setSelectedShip] = useState<Ship | null>(null);
+  const [shipPlacement, setShipPlacement] = useState<number[][]>([]);
+  const [ships, setShips] = useState<Ship[]>(SHIPS);
 
   const doesShipExistOn = (rowIndex: number, colIndex: number, board: number[][]) => {
     return Boolean(board[rowIndex][colIndex])
@@ -54,6 +62,21 @@ function PlayerBoard(props: {
   },[latestMessage]);
 
   useEffect(() => {
+    // browser fetches them as static assets
+    Promise.all([
+      fetch("/shipPlacement/ship_placement.wasm").then(r => r.arrayBuffer()).then(buffer => new Uint8Array(buffer)),
+      fetch("/shipPlacement/ship_placement_final.zkey").then(r => r.arrayBuffer()).then(buffer => new Uint8Array(buffer)),
+    ])
+    .then(([wasm, zkey]) => {
+      setWasmBuffer(wasm);
+      setZkeyBuffer(zkey);
+    })
+    .catch(err => {
+      console.error("failed to load wasm or zkey:", err);
+    });
+  }, []);
+
+  useEffect(() => {
     if (!isLoading) {
       sendMessage(player, 'joined');
     }
@@ -70,6 +93,23 @@ function PlayerBoard(props: {
     console.log(ships);
     console.log(board);
     console.log(shipPlacement);
+
+    const gameGenerator = new BattleshipGameGenerator();
+    await gameGenerator.initialize();
+    const correctInput = await gameGenerator.generateCorrectInput(shipPlacement);
+    // console.log(correctInput);
+
+    // console.log(wasmBuffer);
+    // console.log(zkeyBuffer);
+
+    try {
+      const proofPlayer1 = await gameGenerator.generateProof(correctInput, wasmBuffer, zkeyBuffer);
+      console.log(proofPlayer1);
+    } catch (error) {
+      console.error('Proof generation error:', error);
+      // For now, just continue without proof generation
+      console.log('Continuing without proof generation...');
+    }
 
     // 2. Send the ready to play message
     await sendMessage(player, 'ready');
@@ -90,11 +130,6 @@ function PlayerBoard(props: {
 
     console.log("opponent missed");
   }
-
-  const [board, setBoard] = useState(createBoard());
-  const [selectedShip, setSelectedShip] = useState<Ship | null>(null);
-  const [shipPlacement, setShipPlacement] = useState<ShipPlacement[]>([]);
-  const [ships, setShips] = useState<Ship[]>(SHIPS);
 
   const handleReset = () => {
     setShips(SHIPS);
@@ -164,22 +199,8 @@ function PlayerBoard(props: {
       for (let i = 0; i < selectedShip.size; i++) {
         if (selectedShip.orientation === "horizontal") {
           newBoard[rowIndex][colIndex + i] = 1; // Mark ship cells with 1
-          setShipPlacement([...shipPlacement, {
-            id: selectedShip.id,
-            start_x: rowIndex,
-            start_y: colIndex,
-            length: selectedShip.size,
-            orientation: selectedShip.orientation === "horizontal" ? 1 : 0
-          }]);
         } else {
           newBoard[rowIndex + i][colIndex] = 1;
-          setShipPlacement([...shipPlacement, {
-            id: selectedShip.id,
-            start_x: rowIndex,
-            start_y: colIndex,
-            length: selectedShip.size,
-            orientation: selectedShip.orientation === "horizontal" ? 1 : 0
-          }]);
         }
       }
       setBoard(newBoard);
@@ -188,6 +209,7 @@ function PlayerBoard(props: {
       const newShips = ships.map((ship) =>
         ship.id === selectedShip.id ? { ...ship, placed: true } : ship
       );
+      setShipPlacement(prev => [...prev, [rowIndex, colIndex, selectedShip.size, selectedShip.orientation === "horizontal" ? 1 : 0]]);
       setShips(newShips);
       setSelectedShip(null); // Clear selection
     }

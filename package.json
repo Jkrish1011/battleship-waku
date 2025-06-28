@@ -11,10 +11,15 @@
   "dependencies": {
     "@waku/react": "^0.0.7-559159a",
     "@waku/sdk": "^0.0.29",
+    "circomlibjs": "^0.1.7",
+    "crypto": "^1.0.1",
+    "dotenv": "^17.0.0",
+    "ethers": "^6.14.3",
     "next": "14.1.2",
     "protobufjs": "^7.2.6",
     "react": "^18",
-    "react-dom": "^18"
+    "react-dom": "^18",
+    "snarkjs": "^0.7.5"
   },
   "devDependencies": {
     "@types/node": "^20",

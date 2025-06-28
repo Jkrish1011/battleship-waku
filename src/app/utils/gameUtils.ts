@@ -28,7 +28,6 @@ export type Ship = {
 };
 
 export type ShipPlacement = {
-  id: number;
   start_x: number;
   start_y: number;
   length: number;
