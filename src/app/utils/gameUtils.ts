@@ -26,6 +26,15 @@ export type Ship = {
   orientation: string;
   placed: boolean;
 };
+
+export type ShipPlacement = {
+  id: number;
+  start_x: number;
+  start_y: number;
+  length: number;
+  orientation: number;
+};
+
 const BOARD_SIZE = 10;
 
 const createBoard = () =>

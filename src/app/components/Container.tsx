@@ -18,8 +18,6 @@ const Container = (props: {
     const [messages, setMessages] = useState<Message[]>();
     const [latestMessage, setLatestMessage] = useState<Message>();
 
-
-    console.log(messages);
     // This provides the node which we will use for the communication.
     const { node, isLoading, error} = useWaku();
 

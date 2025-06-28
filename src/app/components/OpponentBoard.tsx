@@ -42,11 +42,11 @@ const OpponentBoard = (props: {
 
     const [board, setBoard] = useState(createBoard());
     const [move, setMove] = useState<string>('');
-
     
     const { push } = useLightPush({node, encoder});
 
     const sendMoveMessage = async (rowIndex: any, colIndex: any) => {
+      console.log("sending move message");
       setMove(`${rowIndex},${colIndex}`)
       // 1/ create message
       const newMessage = MoveMessage.create({

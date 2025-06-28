@@ -3,7 +3,7 @@ import React, { useState, useEffect } from "react";
 
 import { Player, Message } from "../types";
 
-import { BOARD_SIZE, createBoard, Ship, SHIPS, ChatMessage, MoveReplyMessage } from "../utils/gameUtils";
+import { BOARD_SIZE, createBoard, Ship, SHIPS, ChatMessage, MoveReplyMessage, ShipPlacement } from "../utils/gameUtils";
 import { useLightPush } from "@waku/react";
 
 function PlayerBoard(props: { 
@@ -46,10 +46,8 @@ function PlayerBoard(props: {
     // Send this message to the opponent board
     await sendMoveReplyMessage(hitOrMiss);
   }
-
   
   useEffect(() => {
-    console.log(latestMessage);
     if(latestMessage){
       handleLatestMessage(latestMessage);
     }
@@ -64,6 +62,16 @@ function PlayerBoard(props: {
   const { push } = useLightPush({node, encoder});
 
   const sendReadyToPlay = async () => {
+    // 1. Check if all ships are placed
+    if(!areAllShipsPlaced()) {
+      alert('Please place all ships before sending ready to play message');
+      return;
+    }
+    console.log(ships);
+    console.log(board);
+    console.log(shipPlacement);
+
+    // 2. Send the ready to play message
     await sendMessage(player, 'ready');
   }
 
@@ -80,20 +88,19 @@ function PlayerBoard(props: {
         return;
     }
 
-    console.log("opponent missed")
-  
-
+    console.log("opponent missed");
   }
 
   const [board, setBoard] = useState(createBoard());
   const [selectedShip, setSelectedShip] = useState<Ship | null>(null);
+  const [shipPlacement, setShipPlacement] = useState<ShipPlacement[]>([]);
   const [ships, setShips] = useState<Ship[]>(SHIPS);
 
   const handleReset = () => {
-
     setShips(SHIPS);
     setSelectedShip(null);
     setBoard(createBoard());
+    setShipPlacement([]);
   };
 
   const handleShipSelection = (ship: Ship) => {
@@ -105,7 +112,6 @@ function PlayerBoard(props: {
   const areAllShipsPlaced = () => {
       // get a count of all placed ships
       const placedShips = ships.filter((_ship: Ship) => _ship.placed);
-
       return placedShips.length === SHIPS.length;
   }
 
@@ -158,8 +164,22 @@ function PlayerBoard(props: {
       for (let i = 0; i < selectedShip.size; i++) {
         if (selectedShip.orientation === "horizontal") {
           newBoard[rowIndex][colIndex + i] = 1; // Mark ship cells with 1
+          setShipPlacement([...shipPlacement, {
+            id: selectedShip.id,
+            start_x: rowIndex,
+            start_y: colIndex,
+            length: selectedShip.size,
+            orientation: selectedShip.orientation === "horizontal" ? 1 : 0
+          }]);
         } else {
           newBoard[rowIndex + i][colIndex] = 1;
+          setShipPlacement([...shipPlacement, {
+            id: selectedShip.id,
+            start_x: rowIndex,
+            start_y: colIndex,
+            length: selectedShip.size,
+            orientation: selectedShip.orientation === "horizontal" ? 1 : 0
+          }]);
         }
       }
       setBoard(newBoard);
@@ -240,10 +260,7 @@ function PlayerBoard(props: {
 
   return (
     <div className="grid grid-cols-2 gap-4">
-      
-      
       <div className="flex flex-col items-center space-y-2 mt-4">
-
         {ships
           .filter((ship) => !ship.placed)
           .map((ship) => (
@@ -257,49 +274,43 @@ function PlayerBoard(props: {
           ))}
       </div>
       <div className="flex flex-col items-center space-y-2 mt-4">
-      <div className="board">
-        {board.map((row, rowIndex) => (
-          <div key={rowIndex} className="row">
-            {row.map((cell, colIndex) => (
-              <div
-                key={colIndex}
-                className={`cell ${cell === 1 ? "ship" : ""}`} // Use 'ship' class for cells with a ship
-                onClick={() => {
-                  if (cell === 1) resetShipPlacement(rowIndex);
-                  else placeShipOnBoard(rowIndex, colIndex);
-                }}
-              >
-                {
-                  cell === 'X' && 'X'
-                }
-              </div>
-            ))}
+        <div className="board">
+          {board.map((row, rowIndex) => (
+            <div key={rowIndex} className="row">
+              {row.map((cell, colIndex) => (
+                <div
+                  key={colIndex}
+                  className={`cell ${cell === 1 ? "ship" : ""}`} // Use 'ship' class for cells with a ship
+                  onClick={() => {
+                    if (cell === 1) resetShipPlacement(rowIndex);
+                    else placeShipOnBoard(rowIndex, colIndex);
+                  }}
+                >
+                  {
+                    cell === 'X' && 'X'
+                  }
+                </div>
+              ))}
+            </div>
+          ))}
+          <div className="flex justify-between items-center w-full py-4">
+
+          <button 
+            onClick={handleReset}
+            className="px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white font-bold rounded focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-opacity-50"
+            >
+            reset
+            </button>
+            <button
+              onClick={sendReadyToPlay}
+              className={`px-6 py-2 font-bold text-lg rounded transition-colors duration-150 ${
+                areAllShipsPlaced() ? 'bg-green-500 text-white hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-50' : 'bg-gray-500 text-gray-200 cursor-not-allowed'}`}
+            >
+            Ready to play
+            </button>
           </div>
-        ))}
-
-
-      <div className="flex justify-between items-center w-full py-4">
-
-<button 
-  onClick={handleReset}
-  className="px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white font-bold rounded focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-opacity-50"
-
-  >
-    
-  reset
-  </button>
-  <button
-    onClick={sendReadyToPlay}
-    className={`px-6 py-2 font-bold text-lg rounded transition-colors duration-150 ${
-      areAllShipsPlaced() ? 'bg-green-500 text-white hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-50' : 'bg-gray-500 text-gray-200 cursor-not-allowed'}`}
-  >
-  Ready to play
-  </button>
-</div>
+        </div>
       </div>
-      </div>
-
-      
     </div>
   );
 }
