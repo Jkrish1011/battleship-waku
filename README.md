@@ -1,6 +1,6 @@
-# Battle Ship Game powered by Waku Protocol
+# Zero Knowledge Battle Ship Game powered by Waku Protocol
 
-This battleship game is built to communicate over the waku protocol
+This Battleship game communicates over the Waku protocol. Each player’s move and the board state are presented and verified using zk-SNARKs implemented in Circom circuits.
 
 ## Getting Started
 

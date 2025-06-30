@@ -79,9 +79,9 @@ contract BattleshipWaku is Initializable, OwnableUpgradeable, UUPSUpgradeable {
 
     mapping(uint256 => Game) public games;
 
-    event GameCreated(uint256 indexed gameId, address player1, address player2, uint256 player1BoardCommitment, 
-        uint256 player1MerkleRoot, uint256 player2BoardCommitment, uint256 player2MerkleRoot);
-
+    event GameCreated(uint256 indexed gameId, address player1, uint256 player1BoardCommitment, uint256 player1MerkleRoot);
+    event GameJoined(uint256 indexed gameId, address player2);
+    event GameStarted(uint256 indexed gameId);
     event MoveMade(uint256 indexedgameId, address player);
     event GameEnded(uint256 indexed gameId, address winner);
     
@@ -98,41 +98,99 @@ contract BattleshipWaku is Initializable, OwnableUpgradeable, UUPSUpgradeable {
         winVerifier = IWinVerifier(_winVerifier);
     }
 
+    // function createGame(
+    //     address player1, 
+    //     address player2, 
+    //     ShipPlacementProof calldata shipPlacementProofPlayer1,
+    //     ShipPlacementProof calldata shipPlacementProofPlayer2,
+    //     uint256 gameId) external onlyOwner {
+    //     require(player1 != address(0) && player2 != address(0), "Invalid player addresses");
+    //     require(player1 != player2, "Players cannot be the same");
+    //     require(games[gameId].isActive == false, "Game already exists");
+
+    //     // Verify the ship placement is valid using ship_placement.circom
+    //     bool isShipPlacementValid1 = shipPlacementVerifier.verifyProof(shipPlacementProofPlayer1.pA, shipPlacementProofPlayer1.pB, shipPlacementProofPlayer1.pC, shipPlacementProofPlayer1.pubSignals);
+    //     require(isShipPlacementValid1, "Player 1 ship placement proof is invalid");
+    //     bool isShipPlacementValid2 = shipPlacementVerifier.verifyProof(shipPlacementProofPlayer2.pA, shipPlacementProofPlayer2.pB, shipPlacementProofPlayer2.pC, shipPlacementProofPlayer2.pubSignals);
+    //     require(isShipPlacementValid2, "Player 2 ship placement proof is invalid");
+
+    //     // Create a new game
+    //     Game storage newGame = games[gameId];
+    //     newGame.gameId = gameId;
+    //     newGame.player1 = player1;
+    //     newGame.player2 = player2;
+    //     newGame.isActive = true;
+    //     newGame.playerTurn = player1;
+    //     newGame.player1_board_commitment = bytes32(shipPlacementProofPlayer1.pubSignals[0]);
+    //     newGame.player1_merkle_root = bytes32(shipPlacementProofPlayer1.pubSignals[1]);
+    //     newGame.player2_board_commitment = bytes32(shipPlacementProofPlayer2.pubSignals[0]);
+    //     newGame.player2_merkle_root = bytes32(shipPlacementProofPlayer2.pubSignals[1]);
+    //     newGame.player1ShipPlacementProof = shipPlacementProofPlayer1;
+    //     newGame.player2ShipPlacementProof = shipPlacementProofPlayer2;
+    //     newGame.player_hits[player1] = 0;
+    //     newGame.player_hits[player2] = 0;
+
+    //     emit GameCreated(gameId, player1, player2, shipPlacementProofPlayer1.pubSignals[0], 
+    //         shipPlacementProofPlayer1.pubSignals[1], shipPlacementProofPlayer2.pubSignals[0], 
+    //         shipPlacementProofPlayer2.pubSignals[1]);
+    // }
+
     function createGame(
         address player1, 
-        address player2, 
         ShipPlacementProof calldata shipPlacementProofPlayer1,
-        ShipPlacementProof calldata shipPlacementProofPlayer2,
-        uint256 gameId) external onlyOwner {
-        require(player1 != address(0) && player2 != address(0), "Invalid player addresses");
-        require(player1 != player2, "Players cannot be the same");
+        uint256 gameId) external {
+        require(player1 != address(0), "Invalid player addresses");
         require(games[gameId].isActive == false, "Game already exists");
 
         // Verify the ship placement is valid using ship_placement.circom
         bool isShipPlacementValid1 = shipPlacementVerifier.verifyProof(shipPlacementProofPlayer1.pA, shipPlacementProofPlayer1.pB, shipPlacementProofPlayer1.pC, shipPlacementProofPlayer1.pubSignals);
         require(isShipPlacementValid1, "Player 1 ship placement proof is invalid");
-        bool isShipPlacementValid2 = shipPlacementVerifier.verifyProof(shipPlacementProofPlayer2.pA, shipPlacementProofPlayer2.pB, shipPlacementProofPlayer2.pC, shipPlacementProofPlayer2.pubSignals);
-        require(isShipPlacementValid2, "Player 2 ship placement proof is invalid");
 
         // Create a new game
         Game storage newGame = games[gameId];
         newGame.gameId = gameId;
         newGame.player1 = player1;
-        newGame.player2 = player2;
-        newGame.isActive = true;
+        newGame.player2 = address(0);
+        newGame.isActive = false;
         newGame.playerTurn = player1;
         newGame.player1_board_commitment = bytes32(shipPlacementProofPlayer1.pubSignals[0]);
         newGame.player1_merkle_root = bytes32(shipPlacementProofPlayer1.pubSignals[1]);
+        newGame.player2_board_commitment = bytes32(0);
+        newGame.player2_merkle_root = bytes32(0);
+        newGame.player1ShipPlacementProof = shipPlacementProofPlayer1;
+        newGame.player2ShipPlacementProof = ShipPlacementProof({
+            pA: [uint256(0), uint256(0)],
+            pB: [[uint256(0), uint256(0)], [uint256(0), uint256(0)]],
+            pC: [uint256(0), uint256(0)],
+            pubSignals: [uint256(0), uint256(0)]
+        });
+        newGame.player_hits[player1] = 0; 
+
+        emit GameCreated(gameId, player1, shipPlacementProofPlayer1.pubSignals[0], shipPlacementProofPlayer1.pubSignals[1]);
+    }
+
+    function JoinGame(
+        address player2, 
+        ShipPlacementProof calldata shipPlacementProofPlayer2,
+        uint256 gameId) external {
+        require(player2 != address(0), "Invalid player addresses");
+        require(games[gameId].player2 == address(0), "Game already started");
+
+        // Verify the ship placement is valid using ship_placement.circom
+        bool isShipPlacementValid2 = shipPlacementVerifier.verifyProof(shipPlacementProofPlayer2.pA, shipPlacementProofPlayer2.pB, shipPlacementProofPlayer2.pC, shipPlacementProofPlayer2.pubSignals);
+        require(isShipPlacementValid2, "Player 2 ship placement proof is invalid");
+        
+        Game storage newGame = games[gameId];
+        newGame.player2 = player2;
+        newGame.isActive = true;
+        newGame.playerTurn = player2;
         newGame.player2_board_commitment = bytes32(shipPlacementProofPlayer2.pubSignals[0]);
         newGame.player2_merkle_root = bytes32(shipPlacementProofPlayer2.pubSignals[1]);
-        newGame.player1ShipPlacementProof = shipPlacementProofPlayer1;
         newGame.player2ShipPlacementProof = shipPlacementProofPlayer2;
-        newGame.player_hits[player1] = 0;
         newGame.player_hits[player2] = 0;
 
-        emit GameCreated(gameId, player1, player2, shipPlacementProofPlayer1.pubSignals[0], 
-            shipPlacementProofPlayer1.pubSignals[1], shipPlacementProofPlayer2.pubSignals[0], 
-            shipPlacementProofPlayer2.pubSignals[1]);
+        emit GameJoined(gameId, player2);
+        emit GameStarted(gameId);
     }
 
     function getGame(uint256 gameId) external view returns (GameView memory gameData, uint8 player1Hits, uint8 player2Hits) {
