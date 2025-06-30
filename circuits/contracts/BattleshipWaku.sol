@@ -183,7 +183,6 @@ contract BattleshipWaku is Initializable, OwnableUpgradeable, UUPSUpgradeable {
         Game storage newGame = games[gameId];
         newGame.player2 = player2;
         newGame.isActive = true;
-        newGame.playerTurn = player2;
         newGame.player2_board_commitment = bytes32(shipPlacementProofPlayer2.pubSignals[0]);
         newGame.player2_merkle_root = bytes32(shipPlacementProofPlayer2.pubSignals[1]);
         newGame.player2ShipPlacementProof = shipPlacementProofPlayer2;

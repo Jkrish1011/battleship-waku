@@ -134,8 +134,8 @@ describe("BattleshipWakuGame", function () {
     const shipPlacementProofPlayer2 = await battleshipWaku.JoinGame(player2Address, proofPlayer2_converted, gameId);
     console.log("JoinGame txHash: ", shipPlacementProofPlayer2.hash);
 
-    const gameState = await battleshipWaku.getGame(gameId);
-    console.log("gameState", gameState);
+    const gameState2 = await battleshipWaku.getGame(gameId);
+    console.log("gameState", gameState2);
 
     /*
       Player 1 will make a move.
@@ -145,125 +145,125 @@ describe("BattleshipWakuGame", function () {
       and vise-versa for player 2.
     */
     
-    // const moveWasmPath = path.join(__dirname, "..", "build", "move_verification", "move_verification_js", "move_verification.wasm");
-    // const moveZkeyPath = path.join(__dirname, "..", "keys", "move_verification_final.zkey");
-    // if (!fs.existsSync(moveWasmPath)) {
-    //   throw new Error(`WASM file not found at: ${moveWasmPath}`);
-    // }
+    const moveWasmPath = path.join(__dirname, "..", "build", "move_verification", "move_verification_js", "move_verification.wasm");
+    const moveZkeyPath = path.join(__dirname, "..", "keys", "move_verification_final.zkey");
+    if (!fs.existsSync(moveWasmPath)) {
+      throw new Error(`WASM file not found at: ${moveWasmPath}`);
+    }
     
-    // if (!fs.existsSync(moveZkeyPath)) {
-    //     throw new Error(`zkey file not found at: ${moveZkeyPath}`);
-    // }
-    // console.log("moveWasmPath", moveWasmPath);
-    // console.log("zkemoveZkeyPathyPath", moveZkeyPath);
+    if (!fs.existsSync(moveZkeyPath)) {
+        throw new Error(`zkey file not found at: ${moveZkeyPath}`);
+    }
+    console.log("moveWasmPath", moveWasmPath);
+    console.log("zkemoveZkeyPathyPath", moveZkeyPath);
 
-    // const player1ShipPositions = gameGenerator.calculateShipPositions(shipPositions1);
-    // const player2ShipPositions = gameGenerator.calculateShipPositions(shipPositions2);
+    const player1ShipPositions = gameGenerator.calculateShipPositions(shipPositions1);
+    const player2ShipPositions = gameGenerator.calculateShipPositions(shipPositions2);
 
-    // for (let i = 0; i < 12; i++) {
-    //   // Player 1 makes a move
-    //   console.log("Player 1 makes a move", i);
-    //   const guessPlayer1 = player2ShipPositions[i];
-    //   const hit = 1;
+    for (let i = 0; i < 12; i++) {
+      // Player 1 makes a move
+      console.log("Player 1 makes a move", i);
+      const guessPlayer1 = player2ShipPositions[i];
+      const hit = 1;
     
-    //   const moveInputPlayer1 = {
-    //     salt: shipPlacementPositionsPlayer2.salt,
-    //     commitment: shipPlacementPositionsPlayer2.commitment,
-    //     merkle_root: shipPlacementPositionsPlayer2.merkle_root,
-    //     board_state: shipPlacementPositionsPlayer2.board_state,
-    //     guess_x: guessPlayer1[0],
-    //     guess_y: guessPlayer1[1],
-    //     hit: hit
-    //   };
-    //   const proofMovePlayer1 = await gameGenerator.generateProof(moveInputPlayer1, moveWasmPath, moveZkeyPath);
-    //   // console.log(proofPlayer1);
-    //   const proofMovePlayer1_converted = {
-    //     pA: proofMovePlayer1[0],
-    //     pB: proofMovePlayer1[1],
-    //     pC: proofMovePlayer1[2],
-    //     pubSignals: proofMovePlayer1[3]
-    //   };
+      const moveInputPlayer1 = {
+        salt: shipPlacementPositionsPlayer2.salt,
+        commitment: shipPlacementPositionsPlayer2.commitment,
+        merkle_root: shipPlacementPositionsPlayer2.merkle_root,
+        board_state: shipPlacementPositionsPlayer2.board_state,
+        guess_x: guessPlayer1[0],
+        guess_y: guessPlayer1[1],
+        hit: hit
+      };
+      const proofMovePlayer1 = await gameGenerator.generateProof(moveInputPlayer1, moveWasmPath, moveZkeyPath);
+      // console.log(proofPlayer1);
+      const proofMovePlayer1_converted = {
+        pA: proofMovePlayer1[0],
+        pB: proofMovePlayer1[1],
+        pC: proofMovePlayer1[2],
+        pubSignals: proofMovePlayer1[3]
+      };
     
-    //   let resultMovePlayer1 = await moveVerifier.verifyProof(proofMovePlayer1_converted.pA, proofMovePlayer1_converted.pB, proofMovePlayer1_converted.pC, proofMovePlayer1_converted.pubSignals);
+      let resultMovePlayer1 = await moveVerifier.verifyProof(proofMovePlayer1_converted.pA, proofMovePlayer1_converted.pB, proofMovePlayer1_converted.pC, proofMovePlayer1_converted.pubSignals);
       
 
-    //   // Connect the contract to player1
-    //   const battleshipWakuWithPlayer1 = battleshipWaku.connect(player1);
-    //   const moveTxHash = await battleshipWakuWithPlayer1.makeMove(gameId, proofMovePlayer1_converted);
-    //   console.log("makeMove txHash: ", moveTxHash);
+      // Connect the contract to player1
+      const battleshipWakuWithPlayer1 = battleshipWaku.connect(player1);
+      const moveTxHash = await battleshipWakuWithPlayer1.makeMove(gameId, proofMovePlayer1_converted);
+      console.log("makeMove txHash: ", moveTxHash);
 
-    //   // Player 2 makes a move
-    //   console.log("Player 2 makes a move", i);
-    //    const guessPlayer2 = player1ShipPositions[i];
-    //     const hit2 = 1;
+      // Player 2 makes a move
+      console.log("Player 2 makes a move", i);
+       const guessPlayer2 = player1ShipPositions[i];
+        const hit2 = 1;
       
-    //     const moveInputPlayer2 = {
-    //       salt: shipPlacementPositionsPlayer1.salt,
-    //       commitment: shipPlacementPositionsPlayer1.commitment,
-    //       merkle_root: shipPlacementPositionsPlayer1.merkle_root,
-    //       board_state: shipPlacementPositionsPlayer1.board_state,
-    //       guess_x: guessPlayer2[0],
-    //       guess_y: guessPlayer2[1],
-    //       hit: hit2
-    //     };
-    //     const proofMovePlayer2 = await gameGenerator.generateProof(moveInputPlayer2, moveWasmPath, moveZkeyPath);
-    //     // console.log(proofPlayer1);
-    //     const proofMovePlayer2_converted = {
-    //       pA: proofMovePlayer2[0],
-    //       pB: proofMovePlayer2[1],
-    //       pC: proofMovePlayer2[2],
-    //       pubSignals: proofMovePlayer2[3]
-    //     };
+        const moveInputPlayer2 = {
+          salt: shipPlacementPositionsPlayer1.salt,
+          commitment: shipPlacementPositionsPlayer1.commitment,
+          merkle_root: shipPlacementPositionsPlayer1.merkle_root,
+          board_state: shipPlacementPositionsPlayer1.board_state,
+          guess_x: guessPlayer2[0],
+          guess_y: guessPlayer2[1],
+          hit: hit2
+        };
+        const proofMovePlayer2 = await gameGenerator.generateProof(moveInputPlayer2, moveWasmPath, moveZkeyPath);
+        // console.log(proofPlayer1);
+        const proofMovePlayer2_converted = {
+          pA: proofMovePlayer2[0],
+          pB: proofMovePlayer2[1],
+          pC: proofMovePlayer2[2],
+          pubSignals: proofMovePlayer2[3]
+        };
       
-    //     let resultMovePlayer2 = await moveVerifier.verifyProof(proofMovePlayer2_converted.pA, proofMovePlayer2_converted.pB, proofMovePlayer2_converted.pC, proofMovePlayer2_converted.pubSignals);
+        let resultMovePlayer2 = await moveVerifier.verifyProof(proofMovePlayer2_converted.pA, proofMovePlayer2_converted.pB, proofMovePlayer2_converted.pC, proofMovePlayer2_converted.pubSignals);
 
-    //     // Connect the contract to player1
-    //     const battleshipWakuWithPlayer2 = battleshipWaku.connect(player2);
-    //     const moveTxHash2 = await battleshipWakuWithPlayer2.makeMove(gameId, proofMovePlayer2_converted);
-    //     console.log("makeMove txHash: ", moveTxHash2);
-    // }
+        // Connect the contract to player1
+        const battleshipWakuWithPlayer2 = battleshipWaku.connect(player2);
+        const moveTxHash2 = await battleshipWakuWithPlayer2.makeMove(gameId, proofMovePlayer2_converted);
+        console.log("makeMove txHash: ", moveTxHash2);
+    }
 
-    // // get game state
-    // const gameState = await battleshipWaku.getGame(gameId);
-    // console.log("gameState", ...gameState);
+    // get game state
+    const gameState = await battleshipWaku.getGame(gameId);
+    console.log("gameState", ...gameState);
 
-    // const winWasmPath = path.join(__dirname, "..", "build", "win_verification", "win_verification_js", "win_verification.wasm");
-    // const winZkeyPath = path.join(__dirname, "..", "keys", "win_verification_final.zkey");
-    // if (!fs.existsSync(winWasmPath)) {
-    //   throw new Error(`WASM file not found at: ${winWasmPath}`);
-    // }
+    const winWasmPath = path.join(__dirname, "..", "build", "win_verification", "win_verification_js", "win_verification.wasm");
+    const winZkeyPath = path.join(__dirname, "..", "keys", "win_verification_final.zkey");
+    if (!fs.existsSync(winWasmPath)) {
+      throw new Error(`WASM file not found at: ${winWasmPath}`);
+    }
     
-    // if (!fs.existsSync(winZkeyPath)) {
-    //     throw new Error(`zkey file not found at: ${winZkeyPath}`);
-    // }
-    // console.log("winWasmPath", winWasmPath);
-    // console.log("winZkeyPath", winZkeyPath);
+    if (!fs.existsSync(winZkeyPath)) {
+        throw new Error(`zkey file not found at: ${winZkeyPath}`);
+    }
+    console.log("winWasmPath", winWasmPath);
+    console.log("winZkeyPath", winZkeyPath);
 
-    // // Win verification for Player 1
-    // const winInputPlayer1 = {
-    //   salt: shipPlacementPositionsPlayer2.salt,
-    //   commitment: shipPlacementPositionsPlayer2.commitment,
-    //   merkle_root: shipPlacementPositionsPlayer2.merkle_root,
-    //   board_state: shipPlacementPositionsPlayer2.board_state,
-    //   hit_count: 12,
-    //   hits: player2ShipPositions,
-    // }
+    // Win verification for Player 1
+    const winInputPlayer1 = {
+      salt: shipPlacementPositionsPlayer2.salt,
+      commitment: shipPlacementPositionsPlayer2.commitment,
+      merkle_root: shipPlacementPositionsPlayer2.merkle_root,
+      board_state: shipPlacementPositionsPlayer2.board_state,
+      hit_count: 12,
+      hits: player2ShipPositions,
+    }
 
-    // const proofWinPlayer1 = await gameGenerator.generateProof(winInputPlayer1, winWasmPath, winZkeyPath);
-    // const proofWinPlayer1_converted = {
-    //   pA: proofWinPlayer1[0],
-    //   pB: proofWinPlayer1[1],
-    //   pC: proofWinPlayer1[2],
-    //   pubSignals: proofWinPlayer1[3]
-    // }
+    const proofWinPlayer1 = await gameGenerator.generateProof(winInputPlayer1, winWasmPath, winZkeyPath);
+    const proofWinPlayer1_converted = {
+      pA: proofWinPlayer1[0],
+      pB: proofWinPlayer1[1],
+      pC: proofWinPlayer1[2],
+      pubSignals: proofWinPlayer1[3]
+    }
 
-    // let resultWinPlayer1 = await winVerifier.verifyProof(proofWinPlayer1_converted.pA, proofWinPlayer1_converted.pB, proofWinPlayer1_converted.pC, proofWinPlayer1_converted.pubSignals);
-    // console.log("resultWinPlayer1", resultWinPlayer1);
+    let resultWinPlayer1 = await winVerifier.verifyProof(proofWinPlayer1_converted.pA, proofWinPlayer1_converted.pB, proofWinPlayer1_converted.pC, proofWinPlayer1_converted.pubSignals);
+    console.log("resultWinPlayer1", resultWinPlayer1);
 
-    // // Connect the contract to player1
-    // const battleshipWakuWithPlayer1 = battleshipWaku.connect(player1);
-    // const winTxHash = await battleshipWakuWithPlayer1.winVerification(gameId, proofWinPlayer1_converted);
-    // console.log("winVerification txHash: ", winTxHash);
+    // Connect the contract to player1
+    const battleshipWakuWithPlayer1 = battleshipWaku.connect(player1);
+    const winTxHash = await battleshipWakuWithPlayer1.winVerification(gameId, proofWinPlayer1_converted);
+    console.log("winVerification txHash: ", winTxHash);
   });
 
   it.only("Win verification Failure", async function () {
@@ -335,8 +335,14 @@ describe("BattleshipWakuGame", function () {
     let result2 = await shipPlacementVerifier.verifyProof(proofPlayer2_converted.pA, proofPlayer2_converted.pB, proofPlayer2_converted.pC, proofPlayer2_converted.pubSignals);
     console.log("result2", result2);
 
-    const shipPlacementProofPlayer1 = await battleshipWaku.createGame(player1Address, player2Address, proofPlayer1_converted, proofPlayer2_converted, gameId);
+    const shipPlacementProofPlayer1 = await battleshipWaku.createGame(player1Address, proofPlayer1_converted, gameId);
     console.log("createGame txHash: ", shipPlacementProofPlayer1.hash);
+
+    const shipPlacementProofPlayer2 = await battleshipWaku.JoinGame(player2Address, proofPlayer2_converted, gameId);
+    console.log("JoinGame txHash: ", shipPlacementProofPlayer2.hash);
+
+    const gameState = await battleshipWaku.getGame(gameId);
+    console.log("gameState", gameState);
 
     const winWasmPath = path.join(__dirname, "..", "build", "win_verification", "win_verification_js", "win_verification.wasm");
     const winZkeyPath = path.join(__dirname, "..", "keys", "win_verification_final.zkey");
