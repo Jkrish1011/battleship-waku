@@ -1,11 +1,14 @@
 "use client"
 import React, { useState, useEffect } from "react";
-
+import { useRouter } from "next/navigation";
 import { Player, Message } from "../types";
 
 import { BOARD_SIZE, createBoard, Ship, SHIPS, ChatMessage, MoveReplyMessage } from "../utils/gameUtils";
 import { useLightPush } from "@waku/react";
 import { BattleshipGameGenerator } from "./helpers/gameGenerator";
+import { ethers } from "ethers";
+import battleshipWakuAbi from "./../abi/BattleshipWaku.json" assert { type: "json" };
+import useWallet from "../store/useWallet";
 
 function PlayerBoard(props: { 
   latestMessage?: Message,
@@ -13,17 +16,19 @@ function PlayerBoard(props: {
   node: any,
   isLoading: boolean,
   error: any,
-  encoder: any
+  encoder: any,
+  roomId: string
 }) {
-  const {node, encoder, isLoading, player, latestMessage} = props;
+  const {node, encoder, isLoading, player, latestMessage, roomId} = props;
   const [wasmBuffer, setWasmBuffer] = useState<Uint8Array|null>(null);
   const [zkeyBuffer, setZkeyBuffer] = useState<Uint8Array|null>(null);
-
+  const {address} = useWallet() as {address: string | null};
   const [board, setBoard] = useState(createBoard());
   const [selectedShip, setSelectedShip] = useState<Ship | null>(null);
   const [shipPlacement, setShipPlacement] = useState<number[][]>([]);
   const [ships, setShips] = useState<Ship[]>(SHIPS);
-
+  const router = useRouter();
+  
   const doesShipExistOn = (rowIndex: number, colIndex: number, board: number[][]) => {
     return Boolean(board[rowIndex][colIndex])
   }
@@ -83,6 +88,26 @@ function PlayerBoard(props: {
   }, [isLoading]);
 
   const { push } = useLightPush({node, encoder});
+  
+  const getContract = async (CONTRACT_ADDRESS: string, CONTRACT_ABI: any) => {
+    try {
+      const { ethereum } = window as any;
+      if (!ethereum) throw new Error('MetaMask not found');
+  
+      // Validate contract address format
+      if (!CONTRACT_ADDRESS || !ethers.isAddress(CONTRACT_ADDRESS)) {
+        throw new Error(`Invalid contract address: ${CONTRACT_ADDRESS}`);
+      }
+  
+      const provider = new ethers.BrowserProvider(ethereum);
+      const signer = await provider.getSigner();
+      
+      return new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
+    } catch (error) {
+      console.error('Contract initialization failed:', error);
+      throw error;
+    }
+  };
 
   const sendReadyToPlay = async () => {
     // 1. Check if all ships are placed
@@ -103,8 +128,33 @@ function PlayerBoard(props: {
     // console.log(zkeyBuffer);
 
     try {
-      const proofPlayer1 = await gameGenerator.generateProof(correctInput, wasmBuffer, zkeyBuffer);
+      const proofPlayer1 = await gameGenerator.generateProof(correctInput, wasmBuffer as Uint8Array, zkeyBuffer as Uint8Array);
       console.log(proofPlayer1);
+      const proofPlayer1_converted = {
+        pA: proofPlayer1[0],
+        pB: proofPlayer1[1],
+        pC: proofPlayer1[2],
+        pubSignals: proofPlayer1[3]
+      }
+      console.log(proofPlayer1_converted);
+
+      // const provider = new ethers.JsonRpcProvider(process.env.RPC_URL as string);
+      const battleshipWaku = await getContract(process.env.NEXT_PUBLIC_BATTLESHIP_CONTRACT_ADDRESS as string, battleshipWakuAbi.abi);
+        // Get the user's address from the signer
+      const signer = battleshipWaku.runner; // This is the signer from your getContract function
+      const userAddress = await signer?.getAddress();
+      const gameId = gameGenerator.randomBytesCrypto(32);
+      console.log(battleshipWakuAbi);
+      console.log('Creating game with:');
+      console.log('Player address:', userAddress);
+      console.log('Game ID:', gameId);
+      console.log('Proof:', proofPlayer1_converted);
+      console.log({roomId});
+      const tx = await battleshipWaku.createGame(userAddress.toString(), proofPlayer1_converted, gameId, roomId, {
+        gasLimit: 5000000 // Adjust as needed
+      });
+      console.log(tx);
+
     } catch (error) {
       console.error('Proof generation error:', error);
       // For now, just continue without proof generation
@@ -242,7 +292,7 @@ function PlayerBoard(props: {
         });
         // console.log({pushRes});
 
-        if (pushRes?.errors?.length && pushRes?.errors?.length) {
+        if (!pushRes) {
           alert('unable to connect to a stable node. please reload the page!');
         }
       }
@@ -274,7 +324,7 @@ function PlayerBoard(props: {
         });
         // console.log({pushRes});
 
-        if (pushRes?.errors?.length && pushRes?.errors?.length) {
+        if (!pushRes) {
           alert('unable to connect to a stable node. please reload the page!');
         }
       }

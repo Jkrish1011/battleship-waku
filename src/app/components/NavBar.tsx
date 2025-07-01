@@ -12,7 +12,7 @@ const NavBar = () => {
             
             {address ? (
                 <>
-                    <p>{shortenAddress(address)}</p>
+                <p>{shortenAddress(address)}</p>
                 <button onClick={() => disconnectWallet()} className='bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded'>
                     Disconnect Wallet
                 </button>
@@ -24,7 +24,7 @@ const NavBar = () => {
             )}
         </div>
     </div>
-  )
+    );
 }
 
 export default NavBar

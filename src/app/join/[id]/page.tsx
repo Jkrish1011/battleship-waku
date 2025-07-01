@@ -18,7 +18,7 @@ const Page = () => {
                 Welcome, <span className="text-green-500">{username}</span> <br />
                 you have joined the room <span className="text-blue-500"> {roomId} </span>
             </div>
-            <Container player={Player.p2} />
+            <Container player={Player.p2} roomId={roomId} />
         </div>
         </ContentPairProvider>
     )

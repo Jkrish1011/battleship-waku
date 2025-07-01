@@ -61,10 +61,11 @@ contract BattleshipWaku is Initializable, OwnableUpgradeable, UUPSUpgradeable {
         mapping(address => uint8) player_hits;
         ShipPlacementProof player1ShipPlacementProof;
         ShipPlacementProof player2ShipPlacementProof;
+        uint16 wakuRoomId;
     }
 
     struct GameView {
-         uint256 gameId;
+        uint256 gameId;
         address player1;
         address player2;
         bool isActive;
@@ -75,9 +76,11 @@ contract BattleshipWaku is Initializable, OwnableUpgradeable, UUPSUpgradeable {
         bytes32 player2_merkle_root;
         ShipPlacementProof player1ShipPlacementProof;
         ShipPlacementProof player2ShipPlacementProof;
+        uint16 wakuRoomId;
     }
 
     mapping(uint256 => Game) public games;
+    uint256 public gameCount;
 
     event GameCreated(uint256 indexed gameId, address player1, uint256 player1BoardCommitment, uint256 player1MerkleRoot);
     event GameJoined(uint256 indexed gameId, address player2);
@@ -98,47 +101,11 @@ contract BattleshipWaku is Initializable, OwnableUpgradeable, UUPSUpgradeable {
         winVerifier = IWinVerifier(_winVerifier);
     }
 
-    // function createGame(
-    //     address player1, 
-    //     address player2, 
-    //     ShipPlacementProof calldata shipPlacementProofPlayer1,
-    //     ShipPlacementProof calldata shipPlacementProofPlayer2,
-    //     uint256 gameId) external onlyOwner {
-    //     require(player1 != address(0) && player2 != address(0), "Invalid player addresses");
-    //     require(player1 != player2, "Players cannot be the same");
-    //     require(games[gameId].isActive == false, "Game already exists");
-
-    //     // Verify the ship placement is valid using ship_placement.circom
-    //     bool isShipPlacementValid1 = shipPlacementVerifier.verifyProof(shipPlacementProofPlayer1.pA, shipPlacementProofPlayer1.pB, shipPlacementProofPlayer1.pC, shipPlacementProofPlayer1.pubSignals);
-    //     require(isShipPlacementValid1, "Player 1 ship placement proof is invalid");
-    //     bool isShipPlacementValid2 = shipPlacementVerifier.verifyProof(shipPlacementProofPlayer2.pA, shipPlacementProofPlayer2.pB, shipPlacementProofPlayer2.pC, shipPlacementProofPlayer2.pubSignals);
-    //     require(isShipPlacementValid2, "Player 2 ship placement proof is invalid");
-
-    //     // Create a new game
-    //     Game storage newGame = games[gameId];
-    //     newGame.gameId = gameId;
-    //     newGame.player1 = player1;
-    //     newGame.player2 = player2;
-    //     newGame.isActive = true;
-    //     newGame.playerTurn = player1;
-    //     newGame.player1_board_commitment = bytes32(shipPlacementProofPlayer1.pubSignals[0]);
-    //     newGame.player1_merkle_root = bytes32(shipPlacementProofPlayer1.pubSignals[1]);
-    //     newGame.player2_board_commitment = bytes32(shipPlacementProofPlayer2.pubSignals[0]);
-    //     newGame.player2_merkle_root = bytes32(shipPlacementProofPlayer2.pubSignals[1]);
-    //     newGame.player1ShipPlacementProof = shipPlacementProofPlayer1;
-    //     newGame.player2ShipPlacementProof = shipPlacementProofPlayer2;
-    //     newGame.player_hits[player1] = 0;
-    //     newGame.player_hits[player2] = 0;
-
-    //     emit GameCreated(gameId, player1, player2, shipPlacementProofPlayer1.pubSignals[0], 
-    //         shipPlacementProofPlayer1.pubSignals[1], shipPlacementProofPlayer2.pubSignals[0], 
-    //         shipPlacementProofPlayer2.pubSignals[1]);
-    // }
-
     function createGame(
-        address player1, 
+        address player1,
         ShipPlacementProof calldata shipPlacementProofPlayer1,
-        uint256 gameId) external {
+        uint256 gameId,
+        uint16 wakuRoomId) external {
         require(player1 != address(0), "Invalid player addresses");
         require(games[gameId].isActive == false, "Game already exists");
 
@@ -149,6 +116,7 @@ contract BattleshipWaku is Initializable, OwnableUpgradeable, UUPSUpgradeable {
         // Create a new game
         Game storage newGame = games[gameId];
         newGame.gameId = gameId;
+        newGame.wakuRoomId = wakuRoomId;
         newGame.player1 = player1;
         newGame.player2 = address(0);
         newGame.isActive = false;
@@ -165,6 +133,7 @@ contract BattleshipWaku is Initializable, OwnableUpgradeable, UUPSUpgradeable {
             pubSignals: [uint256(0), uint256(0)]
         });
         newGame.player_hits[player1] = 0; 
+        gameCount++;
 
         emit GameCreated(gameId, player1, shipPlacementProofPlayer1.pubSignals[0], shipPlacementProofPlayer1.pubSignals[1]);
     }
@@ -196,6 +165,7 @@ contract BattleshipWaku is Initializable, OwnableUpgradeable, UUPSUpgradeable {
         Game storage game = games[gameId];
         gameData = GameView({
             gameId: game.gameId,
+            wakuRoomId: game.wakuRoomId,
             player1: game.player1,
             player2: game.player2,
             isActive: game.isActive,
@@ -209,6 +179,27 @@ contract BattleshipWaku is Initializable, OwnableUpgradeable, UUPSUpgradeable {
         });
         player1Hits = game.player_hits[game.player1];
         player2Hits = game.player_hits[game.player2];
+    }
+
+    function getAllGames() external view returns (GameView[] memory) {
+        GameView[] memory allGames = new GameView[](gameCount);
+        for(uint256 i = 0; i < gameCount; i++) {
+            allGames[i] = GameView({
+                gameId: games[i].gameId,
+                wakuRoomId: games[i].wakuRoomId,
+                player1: games[i].player1,
+                player2: games[i].player2,
+                isActive: games[i].isActive,
+                playerTurn: games[i].playerTurn,
+                player1_board_commitment: games[i].player1_board_commitment,
+                player1_merkle_root: games[i].player1_merkle_root,
+                player2_board_commitment: games[i].player2_board_commitment,
+                player2_merkle_root: games[i].player2_merkle_root,
+                player1ShipPlacementProof: games[i].player1ShipPlacementProof,
+                player2ShipPlacementProof: games[i].player2ShipPlacementProof
+            });
+        }
+        return allGames;
     }
 
     function getGameStatus(uint256 gameId) external view returns (bool) {
@@ -258,6 +249,7 @@ contract BattleshipWaku is Initializable, OwnableUpgradeable, UUPSUpgradeable {
 
         // Update the game state
         game.isActive = false;
+        gameCount--;
 
         // Emit the game ended event
         emit GameEnded(gameId, winner);

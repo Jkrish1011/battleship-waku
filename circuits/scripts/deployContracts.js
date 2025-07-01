@@ -10,50 +10,37 @@ async function main() {
     try {
         // Deploy verifier contracts first
         console.log("\n1. Deploying verifier contracts...");
-        const shipPlacementVerifier = await hre.ethers.deployContract("ShipPlacementVerifier");
-        await shipPlacementVerifier.waitForDeployment();
-        console.log("shipPlacementVerifier deployed to:", shipPlacementVerifier.target);
-
-        const moveVerifier = await hre.ethers.deployContract("MoveVerifier");
-        await moveVerifier.waitForDeployment();
-        console.log("moveVerifier deployed to:", moveVerifier.target);
-
-        const winVerifier = await hre.ethers.deployContract("WinVerifier");
-        await winVerifier.waitForDeployment();
-        console.log("winVerifier deployed to:", winVerifier.target);
-
-        // Deploy the main contract as a proxy
-        console.log("\n2. Deploying BattleshipWaku as proxy...");
-        const BattleshipWaku = await hre.ethers.getContractFactory("BattleshipWaku");
+        // Deploy all three verifier contracts
+        const verifierArtifacts = ["ShipPlacementVerifier", "MoveVerifier", "WinVerifier"];
+        const verifierAddresses = [];
         
-        console.log("Deploying proxy with verifier addresses:");
-        console.log("- ShipPlacementVerifier:", shipPlacementVerifier.target);
-        console.log("- MoveVerifier:", moveVerifier.target);
-        console.log("- WinVerifier:", winVerifier.target);
+        for (const artifact of verifierArtifacts) {
+            const Verifier = await hre.ethers.getContractFactory(artifact);
+            const verifier = await Verifier.deploy();
+            await verifier.waitForDeployment();
+            const address = await verifier.getAddress();
+            verifierAddresses.push(address);
+            console.log(`${artifact} deployed to:`, address);
+        }
 
-        const battleshipWaku = await hre.upgrades.deployProxy(
-            BattleshipWaku, 
-            [shipPlacementVerifier.target, moveVerifier.target, winVerifier.target],
-            { 
-                initializer: "initialize",
-                kind: "uups" // Explicitly specify proxy type
-            }
-        );
+        console.log("Deploying BattleshipWaku...");
+        const BattleshipWaku = await ethers.getContractFactory("BattleshipWaku");
+        const battleship = await upgrades.deployProxy(BattleshipWaku, verifierAddresses);
+        await battleship.waitForDeployment();
         
-        await battleshipWaku.waitForDeployment();
-        console.log("BattleshipWaku proxy deployed to:", battleshipWaku.target);
+        console.log("BattleshipWaku deployed to:", await battleship.getAddress());
 
         // Verify the proxy deployment
         console.log("\n3. Verifying proxy deployment...");
         try {
-            const implementationAddress = await hre.upgrades.erc1967.getImplementationAddress(battleshipWaku.target);
+            const implementationAddress = await hre.upgrades.erc1967.getImplementationAddress(battleship.target);
             console.log("Implementation deployed to:", implementationAddress);
             
-            const adminAddress = await hre.upgrades.erc1967.getAdminAddress(battleshipWaku.target);
+            const adminAddress = await hre.upgrades.erc1967.getAdminAddress(battleship.target);
             console.log("Admin address:", adminAddress);
             
             // Test if the contract is properly initialized
-            const owner = await battleshipWaku.owner();
+            const owner = await battleship.owner();
             console.log("Contract owner:", owner);
             
             console.log("\n\n Deployment successful!");
@@ -88,7 +75,7 @@ Deploying proxy with verifier addresses:
 BattleshipWaku proxy deployed to: 0x16811dA60a5c16FAa40039a9bDa3B2e0B142e0d8
 
 3. Verifying proxy deployment...
-Implementation deployed to: 0x0aa27C84B104435fe10ffeF5859f5E62347eAEF3
+Implementation deployed to: 0xA92ccFdBFb53B32e708445130f3F7836790cD5CD
 Admin address: 0x0000000000000000000000000000000000000000
 Contract owner: 0x2B27326d412efB3D03B142f4DEA2Dd3E53Dd7bB2
 

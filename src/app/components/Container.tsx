@@ -11,10 +11,11 @@ import { findLatestMessage } from "../utils";
 
 
 const Container = (props: {
-    player: Player
+    player: Player,
+    roomId?: string
 }) => {
 
-    const {player} = props;
+    const {player, roomId} = props;
     const [messages, setMessages] = useState<Message[]>();
     const [latestMessage, setLatestMessage] = useState<Message>();
 
@@ -58,6 +59,7 @@ const Container = (props: {
                 isLoading={isLoading}
                 error={error}
                 encoder={encoder}
+                roomId={roomId || ''}
             />
 
             {
@@ -75,29 +77,23 @@ const Container = (props: {
 
         </div>
 
-        
-    
-
         <div style={{width: '300px'}} className=" mx-auto my-4 p-4 bg-gray-800 text-white rounded-lg shadow">
-
-        <h3 className="text-lg font-semibold border-b border-gray-700 pb-2 mb-4">Messages:</h3>
-
-        <ul className="space-y-2 overflow-y-auto max-h-50">
-            {
-                messages && messages.map((_message: Message, idx) => {
-                    return (
-                        <li key={idx} className={`flex items-center ${_message.sender === Player.p1? `justify-end`: `justify-start`}`}>
-                            <div className={`${_message.sender === Player.p1 ? 'bg-blue-500': 'bg-green-500'} text-sm text-white py-2 px-4 rounded-lg max-w-xs`}>
-                                <p className="font-bold">{_message.sender}</p>
-                                <p>{_message.move || _message.message }</p>
-                            </div>
-                        </li>
-                    )
-                })
-            }
-
-        </ul>
-        </div>
+            <h3 className="text-lg font-semibold border-b border-gray-700 pb-2 mb-4">Messages:</h3>
+                <ul className="space-y-2 overflow-y-auto max-h-50">
+                    {
+                        messages && messages.map((_message: Message, idx) => {
+                            return (
+                                <li key={idx} className={`flex items-center ${_message.sender === Player.p1? `justify-end`: `justify-start`}`}>
+                                    <div className={`${_message.sender === Player.p1 ? 'bg-blue-500': 'bg-green-500'} text-sm text-white py-2 px-4 rounded-lg max-w-xs`}>
+                                        <p className="font-bold">{_message.sender}</p>
+                                        <p>{_message.move || _message.message }</p>
+                                    </div>
+                                </li>
+                            )
+                        })
+                    }
+                </ul>
+            </div>
         </div>
     )
 }

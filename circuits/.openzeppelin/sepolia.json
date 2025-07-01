@@ -801,6 +801,558 @@
           ]
         }
       }
+    },
+    "17ee323a4afa3ec41d3f1468d5c2f1d03899458a837c6359d19ba63dcec80be2": {
+      "address": "0xA92ccFdBFb53B32e708445130f3F7836790cD5CD",
+      "txHash": "0x2a4624ceb22f28891339b488c6bbb92ae1be30b75c0984ce9c2e645d29da6053",
+      "layout": {
+        "solcVersion": "0.8.22",
+        "storage": [
+          {
+            "label": "shipPlacementVerifier",
+            "offset": 0,
+            "slot": "0",
+            "type": "t_contract(IShipPlacementVerifier)1463",
+            "contract": "BattleshipWaku",
+            "src": "contracts/BattleshipWaku.sol:26"
+          },
+          {
+            "label": "moveVerifier",
+            "offset": 0,
+            "slot": "1",
+            "type": "t_contract(IMoveVerifier)1487",
+            "contract": "BattleshipWaku",
+            "src": "contracts/BattleshipWaku.sol:27"
+          },
+          {
+            "label": "winVerifier",
+            "offset": 0,
+            "slot": "2",
+            "type": "t_contract(IWinVerifier)1511",
+            "contract": "BattleshipWaku",
+            "src": "contracts/BattleshipWaku.sol:28"
+          },
+          {
+            "label": "games",
+            "offset": 0,
+            "slot": "3",
+            "type": "t_mapping(t_uint256,t_struct(Game)1612_storage)",
+            "contract": "BattleshipWaku",
+            "src": "contracts/BattleshipWaku.sol:80"
+          },
+          {
+            "label": "gameCount",
+            "offset": 0,
+            "slot": "4",
+            "type": "t_uint256",
+            "contract": "BattleshipWaku",
+            "src": "contracts/BattleshipWaku.sol:81"
+          }
+        ],
+        "types": {
+          "t_address": {
+            "label": "address",
+            "numberOfBytes": "20"
+          },
+          "t_bool": {
+            "label": "bool",
+            "numberOfBytes": "1"
+          },
+          "t_struct(InitializableStorage)73_storage": {
+            "label": "struct Initializable.InitializableStorage",
+            "members": [
+              {
+                "label": "_initialized",
+                "type": "t_uint64",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "_initializing",
+                "type": "t_bool",
+                "offset": 8,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_struct(OwnableStorage)13_storage": {
+            "label": "struct OwnableUpgradeable.OwnableStorage",
+            "members": [
+              {
+                "label": "_owner",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_uint64": {
+            "label": "uint64",
+            "numberOfBytes": "8"
+          },
+          "t_array(t_array(t_uint256)2_storage)2_storage": {
+            "label": "uint256[2][2]",
+            "numberOfBytes": "128"
+          },
+          "t_array(t_uint256)2_storage": {
+            "label": "uint256[2]",
+            "numberOfBytes": "64"
+          },
+          "t_bytes32": {
+            "label": "bytes32",
+            "numberOfBytes": "32"
+          },
+          "t_contract(IMoveVerifier)1487": {
+            "label": "contract IMoveVerifier",
+            "numberOfBytes": "20"
+          },
+          "t_contract(IShipPlacementVerifier)1463": {
+            "label": "contract IShipPlacementVerifier",
+            "numberOfBytes": "20"
+          },
+          "t_contract(IWinVerifier)1511": {
+            "label": "contract IWinVerifier",
+            "numberOfBytes": "20"
+          },
+          "t_mapping(t_address,t_uint8)": {
+            "label": "mapping(address => uint8)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_struct(Game)1612_storage)": {
+            "label": "mapping(uint256 => struct BattleshipWaku.Game)",
+            "numberOfBytes": "32"
+          },
+          "t_struct(Game)1612_storage": {
+            "label": "struct BattleshipWaku.Game",
+            "members": [
+              {
+                "label": "gameId",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "player1",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "player2",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "isActive",
+                "type": "t_bool",
+                "offset": 20,
+                "slot": "2"
+              },
+              {
+                "label": "playerTurn",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "3"
+              },
+              {
+                "label": "player1_board_commitment",
+                "type": "t_bytes32",
+                "offset": 0,
+                "slot": "4"
+              },
+              {
+                "label": "player1_merkle_root",
+                "type": "t_bytes32",
+                "offset": 0,
+                "slot": "5"
+              },
+              {
+                "label": "player2_board_commitment",
+                "type": "t_bytes32",
+                "offset": 0,
+                "slot": "6"
+              },
+              {
+                "label": "player2_merkle_root",
+                "type": "t_bytes32",
+                "offset": 0,
+                "slot": "7"
+              },
+              {
+                "label": "player_hits",
+                "type": "t_mapping(t_address,t_uint8)",
+                "offset": 0,
+                "slot": "8"
+              },
+              {
+                "label": "player1ShipPlacementProof",
+                "type": "t_struct(ShipPlacementProof)1545_storage",
+                "offset": 0,
+                "slot": "9"
+              },
+              {
+                "label": "player2ShipPlacementProof",
+                "type": "t_struct(ShipPlacementProof)1545_storage",
+                "offset": 0,
+                "slot": "19"
+              }
+            ],
+            "numberOfBytes": "928"
+          },
+          "t_struct(ShipPlacementProof)1545_storage": {
+            "label": "struct BattleshipWaku.ShipPlacementProof",
+            "members": [
+              {
+                "label": "pA",
+                "type": "t_array(t_uint256)2_storage",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "pB",
+                "type": "t_array(t_array(t_uint256)2_storage)2_storage",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "pC",
+                "type": "t_array(t_uint256)2_storage",
+                "offset": 0,
+                "slot": "6"
+              },
+              {
+                "label": "pubSignals",
+                "type": "t_array(t_uint256)2_storage",
+                "offset": 0,
+                "slot": "8"
+              }
+            ],
+            "numberOfBytes": "320"
+          },
+          "t_uint256": {
+            "label": "uint256",
+            "numberOfBytes": "32"
+          },
+          "t_uint8": {
+            "label": "uint8",
+            "numberOfBytes": "1"
+          }
+        },
+        "namespaces": {
+          "erc7201:openzeppelin.storage.Ownable": [
+            {
+              "contract": "OwnableUpgradeable",
+              "label": "_owner",
+              "type": "t_address",
+              "src": "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol:24",
+              "offset": 0,
+              "slot": "0"
+            }
+          ],
+          "erc7201:openzeppelin.storage.Initializable": [
+            {
+              "contract": "Initializable",
+              "label": "_initialized",
+              "type": "t_uint64",
+              "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:69",
+              "offset": 0,
+              "slot": "0"
+            },
+            {
+              "contract": "Initializable",
+              "label": "_initializing",
+              "type": "t_bool",
+              "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:73",
+              "offset": 8,
+              "slot": "0"
+            }
+          ]
+        }
+      }
+    },
+    "6c0206a19380e320110d3aa6575d5806eaaa022f328cd403d836b4c18296ffcc": {
+      "address": "0xaFD2963B2Fd6F178578aD0a55e52E03d1E5B264D",
+      "txHash": "0x5c1a0213c2134cd848de7ddc0c80b1dc3b6cd7be07ae5c1af41a6fb54b0b3bd0",
+      "layout": {
+        "solcVersion": "0.8.22",
+        "storage": [
+          {
+            "label": "shipPlacementVerifier",
+            "offset": 0,
+            "slot": "0",
+            "type": "t_contract(IShipPlacementVerifier)1463",
+            "contract": "BattleshipWaku",
+            "src": "contracts/BattleshipWaku.sol:26"
+          },
+          {
+            "label": "moveVerifier",
+            "offset": 0,
+            "slot": "1",
+            "type": "t_contract(IMoveVerifier)1487",
+            "contract": "BattleshipWaku",
+            "src": "contracts/BattleshipWaku.sol:27"
+          },
+          {
+            "label": "winVerifier",
+            "offset": 0,
+            "slot": "2",
+            "type": "t_contract(IWinVerifier)1511",
+            "contract": "BattleshipWaku",
+            "src": "contracts/BattleshipWaku.sol:28"
+          },
+          {
+            "label": "games",
+            "offset": 0,
+            "slot": "3",
+            "type": "t_mapping(t_uint256,t_struct(Game)1614_storage)",
+            "contract": "BattleshipWaku",
+            "src": "contracts/BattleshipWaku.sol:82"
+          },
+          {
+            "label": "gameCount",
+            "offset": 0,
+            "slot": "4",
+            "type": "t_uint256",
+            "contract": "BattleshipWaku",
+            "src": "contracts/BattleshipWaku.sol:83"
+          }
+        ],
+        "types": {
+          "t_address": {
+            "label": "address",
+            "numberOfBytes": "20"
+          },
+          "t_bool": {
+            "label": "bool",
+            "numberOfBytes": "1"
+          },
+          "t_struct(InitializableStorage)73_storage": {
+            "label": "struct Initializable.InitializableStorage",
+            "members": [
+              {
+                "label": "_initialized",
+                "type": "t_uint64",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "_initializing",
+                "type": "t_bool",
+                "offset": 8,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_struct(OwnableStorage)13_storage": {
+            "label": "struct OwnableUpgradeable.OwnableStorage",
+            "members": [
+              {
+                "label": "_owner",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_uint64": {
+            "label": "uint64",
+            "numberOfBytes": "8"
+          },
+          "t_array(t_array(t_uint256)2_storage)2_storage": {
+            "label": "uint256[2][2]",
+            "numberOfBytes": "128"
+          },
+          "t_array(t_uint256)2_storage": {
+            "label": "uint256[2]",
+            "numberOfBytes": "64"
+          },
+          "t_bytes32": {
+            "label": "bytes32",
+            "numberOfBytes": "32"
+          },
+          "t_contract(IMoveVerifier)1487": {
+            "label": "contract IMoveVerifier",
+            "numberOfBytes": "20"
+          },
+          "t_contract(IShipPlacementVerifier)1463": {
+            "label": "contract IShipPlacementVerifier",
+            "numberOfBytes": "20"
+          },
+          "t_contract(IWinVerifier)1511": {
+            "label": "contract IWinVerifier",
+            "numberOfBytes": "20"
+          },
+          "t_mapping(t_address,t_uint8)": {
+            "label": "mapping(address => uint8)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_struct(Game)1614_storage)": {
+            "label": "mapping(uint256 => struct BattleshipWaku.Game)",
+            "numberOfBytes": "32"
+          },
+          "t_struct(Game)1614_storage": {
+            "label": "struct BattleshipWaku.Game",
+            "members": [
+              {
+                "label": "gameId",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "player1",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "player2",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "isActive",
+                "type": "t_bool",
+                "offset": 20,
+                "slot": "2"
+              },
+              {
+                "label": "playerTurn",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "3"
+              },
+              {
+                "label": "player1_board_commitment",
+                "type": "t_bytes32",
+                "offset": 0,
+                "slot": "4"
+              },
+              {
+                "label": "player1_merkle_root",
+                "type": "t_bytes32",
+                "offset": 0,
+                "slot": "5"
+              },
+              {
+                "label": "player2_board_commitment",
+                "type": "t_bytes32",
+                "offset": 0,
+                "slot": "6"
+              },
+              {
+                "label": "player2_merkle_root",
+                "type": "t_bytes32",
+                "offset": 0,
+                "slot": "7"
+              },
+              {
+                "label": "player_hits",
+                "type": "t_mapping(t_address,t_uint8)",
+                "offset": 0,
+                "slot": "8"
+              },
+              {
+                "label": "player1ShipPlacementProof",
+                "type": "t_struct(ShipPlacementProof)1545_storage",
+                "offset": 0,
+                "slot": "9"
+              },
+              {
+                "label": "player2ShipPlacementProof",
+                "type": "t_struct(ShipPlacementProof)1545_storage",
+                "offset": 0,
+                "slot": "19"
+              },
+              {
+                "label": "wakuRoomId",
+                "type": "t_uint16",
+                "offset": 0,
+                "slot": "29"
+              }
+            ],
+            "numberOfBytes": "960"
+          },
+          "t_struct(ShipPlacementProof)1545_storage": {
+            "label": "struct BattleshipWaku.ShipPlacementProof",
+            "members": [
+              {
+                "label": "pA",
+                "type": "t_array(t_uint256)2_storage",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "pB",
+                "type": "t_array(t_array(t_uint256)2_storage)2_storage",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "pC",
+                "type": "t_array(t_uint256)2_storage",
+                "offset": 0,
+                "slot": "6"
+              },
+              {
+                "label": "pubSignals",
+                "type": "t_array(t_uint256)2_storage",
+                "offset": 0,
+                "slot": "8"
+              }
+            ],
+            "numberOfBytes": "320"
+          },
+          "t_uint16": {
+            "label": "uint16",
+            "numberOfBytes": "2"
+          },
+          "t_uint256": {
+            "label": "uint256",
+            "numberOfBytes": "32"
+          },
+          "t_uint8": {
+            "label": "uint8",
+            "numberOfBytes": "1"
+          }
+        },
+        "namespaces": {
+          "erc7201:openzeppelin.storage.Ownable": [
+            {
+              "contract": "OwnableUpgradeable",
+              "label": "_owner",
+              "type": "t_address",
+              "src": "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol:24",
+              "offset": 0,
+              "slot": "0"
+            }
+          ],
+          "erc7201:openzeppelin.storage.Initializable": [
+            {
+              "contract": "Initializable",
+              "label": "_initialized",
+              "type": "t_uint64",
+              "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:69",
+              "offset": 0,
+              "slot": "0"
+            },
+            {
+              "contract": "Initializable",
+              "label": "_initializing",
+              "type": "t_bool",
+              "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:73",
+              "offset": 8,
+              "slot": "0"
+            }
+          ]
+        }
+      }
     }
   }
 }
