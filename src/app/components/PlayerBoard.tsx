@@ -6,9 +6,10 @@ import { Player, Message } from "../types";
 import { BOARD_SIZE, createBoard, Ship, SHIPS, ChatMessage, MoveReplyMessage } from "../utils/gameUtils";
 import { useLightPush } from "@waku/react";
 import { BattleshipGameGenerator } from "./helpers/gameGenerator";
-import { ethers } from "ethers";
+import { getContract } from "../utils/gameUtils";
 import battleshipWakuAbi from "./../abi/BattleshipWaku.json" assert { type: "json" };
 import useWallet from "../store/useWallet";
+import Navbar from "./NavBar";
 
 function PlayerBoard(props: { 
   latestMessage?: Message,
@@ -88,26 +89,6 @@ function PlayerBoard(props: {
   }, [isLoading]);
 
   const { push } = useLightPush({node, encoder});
-  
-  const getContract = async (CONTRACT_ADDRESS: string, CONTRACT_ABI: any) => {
-    try {
-      const { ethereum } = window as any;
-      if (!ethereum) throw new Error('MetaMask not found');
-  
-      // Validate contract address format
-      if (!CONTRACT_ADDRESS || !ethers.isAddress(CONTRACT_ADDRESS)) {
-        throw new Error(`Invalid contract address: ${CONTRACT_ADDRESS}`);
-      }
-  
-      const provider = new ethers.BrowserProvider(ethereum);
-      const signer = await provider.getSigner();
-      
-      return new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
-    } catch (error) {
-      console.error('Contract initialization failed:', error);
-      throw error;
-    }
-  };
 
   const sendReadyToPlay = async () => {
     // 1. Check if all ships are placed
@@ -129,30 +110,22 @@ function PlayerBoard(props: {
 
     try {
       const proofPlayer1 = await gameGenerator.generateProof(correctInput, wasmBuffer as Uint8Array, zkeyBuffer as Uint8Array);
-      console.log(proofPlayer1);
-      const proofPlayer1_converted = {
-        pA: proofPlayer1[0],
-        pB: proofPlayer1[1],
-        pC: proofPlayer1[2],
-        pubSignals: proofPlayer1[3]
-      }
-      console.log(proofPlayer1_converted);
-
+      
       // const provider = new ethers.JsonRpcProvider(process.env.RPC_URL as string);
       const battleshipWaku = await getContract(process.env.NEXT_PUBLIC_BATTLESHIP_CONTRACT_ADDRESS as string, battleshipWakuAbi.abi);
         // Get the user's address from the signer
-      const signer = battleshipWaku.runner; // This is the signer from your getContract function
-      const userAddress = await signer?.getAddress();
+      const userAddress = address;
       const gameId = gameGenerator.randomBytesCrypto(32);
       console.log(battleshipWakuAbi);
       console.log('Creating game with:');
       console.log('Player address:', userAddress);
       console.log('Game ID:', gameId);
-      console.log('Proof:', proofPlayer1_converted);
+      console.log('Proof:', proofPlayer1);
       console.log({roomId});
-      const tx = await battleshipWaku.createGame(userAddress.toString(), proofPlayer1_converted, gameId, roomId, {
+      const tx = await battleshipWaku.createGame(userAddress, proofPlayer1, gameId, roomId, {
         gasLimit: 5000000 // Adjust as needed
       });
+      await tx.wait();
       console.log(tx);
 
     } catch (error) {
@@ -331,6 +304,7 @@ function PlayerBoard(props: {
   }
 
   return (
+    <>
     <div className="grid grid-cols-2 gap-4">
       <div className="flex flex-col items-center space-y-2 mt-4">
         {ships
@@ -384,6 +358,7 @@ function PlayerBoard(props: {
         </div>
       </div>
     </div>
+    </>
   );
 }
 

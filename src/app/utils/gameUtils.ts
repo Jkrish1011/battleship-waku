@@ -1,5 +1,6 @@
 import { Message, Player } from "../types";
 import protobuf from "protobufjs";
+import { ethers } from "ethers";
 
 const isGameReady = (gameMessages: Message[]): boolean => {
   // return true;
@@ -95,6 +96,50 @@ const decodeMessage = (wakuMessage: any, type: string) => {
   }
 };
 
+const getContract = async (CONTRACT_ADDRESS: string, CONTRACT_ABI: any) => {
+  try {
+    // Validate contract address format
+    if (!CONTRACT_ADDRESS || !ethers.isAddress(CONTRACT_ADDRESS)) {
+      throw new Error(`Invalid contract address: ${CONTRACT_ADDRESS}`);
+    }
+
+    // Check if MetaMask is available
+    if (typeof window !== 'undefined' && window.ethereum) {
+      // Use MetaMask provider
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      
+      // Request account access if not already connected
+      try {
+        await window.ethereum.request({ method: 'eth_requestAccounts' });
+      } catch (error) {
+        throw new Error('User rejected MetaMask connection request');
+      }
+      
+      // Get signer from MetaMask
+      const signer = await provider.getSigner();
+      
+      return new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
+      
+    } else if (process.env.NEXT_PUBLIC_RPC_URL) {
+      // Fallback to read-only provider if RPC_URL is provided
+      console.warn('MetaMask not detected. Using read-only contract connection.');
+      const provider = new ethers.JsonRpcProvider(process.env.NEXT_PUBLIC_RPC_URL as string);
+      return new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, provider);
+      
+    } else {
+      throw new Error('MetaMask not detected and no RPC_URL provided for fallback');
+    }
+    
+  } catch (error) {
+    console.error('Contract initialization failed:', error);
+    throw error;
+  }
+};
+
+const shorten = (content: string) => {
+  return content.slice(0, 6) + "..." + content.slice(-4);
+}
+
 export {
   isGameReady,
   BOARD_SIZE,
@@ -104,4 +149,6 @@ export {
   MoveMessage,
   MoveReplyMessage,
   decodeMessage,
+  getContract,
+  shorten,
 };

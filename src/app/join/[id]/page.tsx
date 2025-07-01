@@ -4,6 +4,7 @@ import { ContentPairProvider } from "@waku/react";
 import React from "react";
 import Container from "../../components/Container";
 import { Player } from "../../types";
+import Navbar from "../../components/NavBar";
 
 const Page = () => {
     const searchParams = useParams();
@@ -13,6 +14,7 @@ const Page = () => {
 
     return (
         <ContentPairProvider contentTopic={`/waku-battle-ship-tutorial-${roomId}/1/private-message/proto`}>
+        <Navbar />
         <div className="flex flex-col items-center justify-center min-h-screen space-y-4">
             <div className="text-lg font-bold text-center">
                 Welcome, <span className="text-green-500">{username}</span> <br />

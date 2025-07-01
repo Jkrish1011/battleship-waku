@@ -4,25 +4,24 @@ const shipPlacementVerifierAbi = require("./../artifacts/contracts/ship_placemen
 
 const getContract = async (CONTRACT_ADDRESS, CONTRACT_ABI, RPC_URL) => {
     try {
-      
-      // Validate contract address format
-      if (!CONTRACT_ADDRESS || !ethers.isAddress(CONTRACT_ADDRESS)) {
-        throw new Error(`Invalid contract address: ${CONTRACT_ADDRESS}`);
-      }
+        // Validate contract address format
+        if (!CONTRACT_ADDRESS || !ethers.isAddress(CONTRACT_ADDRESS)) {
+            throw new Error(`Invalid contract address: ${CONTRACT_ADDRESS}`);
+        }
 
-      // Connect to the provider
-      const provider = new ethers.JsonRpcProvider(RPC_URL);
-      
-      // Create a signer using private key from environment
-      if (!process.env.PRIVATE_KEY_SEPOLIA) {
-        throw new Error('PRIVATE_KEY_SEPOLIA environment variable is required');
-      }
-      const signer = new ethers.Wallet(process.env.PRIVATE_KEY_SEPOLIA, provider);
-      
-      return new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
+        // Connect to the provider
+        const provider = new ethers.JsonRpcProvider(RPC_URL);
+        
+        // Create a signer using private key from environment
+        if (!process.env.PRIVATE_KEY_SEPOLIA) {
+            throw new Error('PRIVATE_KEY_SEPOLIA environment variable is required');
+        }
+        const signer = new ethers.Wallet(process.env.PRIVATE_KEY_SEPOLIA, provider);
+        
+        return new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
     } catch (error) {
-      console.error('Contract initialization failed:', error);
-      throw error;
+        console.error('Contract initialization failed:', error);
+        throw error;
     }
   };
 

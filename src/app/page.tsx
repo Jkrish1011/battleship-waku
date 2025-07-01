@@ -14,8 +14,8 @@ export default function Home() {
 
   return (
     <>
+     <NavBar />
       <div className="flex flex-col items-center justify-center min-h-screen">
-        <NavBar />
         <h1 className="text-3xl font-bold">
           Battleship Game
         </h1>
