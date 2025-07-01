@@ -103,8 +103,8 @@ const Page = () => {
           <div>
             {games.map((game) => (
               <div key={Math.random().toString()}>
-                <h1>{game.gameId}</h1>
                 <h1>{game.player1}</h1>
+                <h1>{game.gameId}</h1>
                 <h1>{game.wakuRoomId}</h1>
                 <button>Join</button>
               </div>
