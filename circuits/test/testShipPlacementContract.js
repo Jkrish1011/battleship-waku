@@ -21,6 +21,11 @@ describe("BattleshipWakuGame", function () {
     const shipPlacementVerifier = await hre.ethers.deployContract("ShipPlacementVerifier");
     const moveVerifier = await hre.ethers.deployContract("MoveVerifier");
     const winVerifier = await hre.ethers.deployContract("WinVerifier");
+
+    await shipPlacementVerifier.waitForDeployment();
+    await moveVerifier.waitForDeployment();
+    await winVerifier.waitForDeployment();
+
     console.log("shipPlacementVerifier", shipPlacementVerifier.target);
     console.log("moveVerifier", moveVerifier.target);
     console.log("winVerifier", winVerifier.target);
@@ -30,20 +35,26 @@ describe("BattleshipWakuGame", function () {
     // const battleshipWaku = await deployProxy(BattleshipWaku, [shipPlacementVerifier.target, moveVerifier.target, winVerifier.target],{ initializer: "initialize" });
     // console.log("BattleshipWaku", battleshipWaku.target);
     const BattleshipWaku = await hre.ethers.getContractFactory("BattleshipWaku");
-    const battleshipWaku = await hre.upgrades.deployProxy(BattleshipWaku, [shipPlacementVerifier.target, moveVerifier.target, winVerifier.target],{ initializer: "initialize" });
+    const battleshipWaku = await hre.upgrades.deployProxy(BattleshipWaku, [shipPlacementVerifier.target, moveVerifier.target, winVerifier.target],{ initializer: "initialize", kind: "uups" });
     console.log("BattleshipWaku", battleshipWaku.target);
 
     // Get the proxy address - for proxy deployments, use .target directly
+    await battleshipWaku.waitForDeployment();
     const proxyAddress = battleshipWaku.target;
     console.log("Proxy deployed to:", proxyAddress);
 
-    // Get the implementation address
-    const implementationAddress = await hre.upgrades.erc1967.getImplementationAddress(proxyAddress);
-    console.log("Implementation deployed to:", implementationAddress);
+    try {
+      // Get the implementation address - wrap in try-catch to handle errors gracefully
+      const implementationAddress = await hre.upgrades.erc1967.getImplementationAddress(proxyAddress);
+      console.log("Implementation deployed to:", implementationAddress);
 
-    // Get the admin address
-    const adminAddress = await hre.upgrades.erc1967.getAdminAddress(proxyAddress);
-    console.log("Admin address:", adminAddress);
+      // Get the admin address
+      const adminAddress = await hre.upgrades.erc1967.getAdminAddress(proxyAddress);
+      console.log("Admin address:", adminAddress);
+    } catch (error) {
+      console.log("Note: Could not retrieve proxy addresses - this might be expected for some proxy types");
+      console.log("Error:", error.message);
+    }
 
     return { shipPlacementVerifier, moveVerifier, winVerifier, owner, battleshipWaku, player1, player2, gameGenerator, gameId };
   }
@@ -127,8 +138,9 @@ describe("BattleshipWakuGame", function () {
     };
     let result2 = await shipPlacementVerifier.verifyProof(proofPlayer2_converted.pA, proofPlayer2_converted.pB, proofPlayer2_converted.pC, proofPlayer2_converted.pubSignals);
     console.log("result2", result2);
+    const wakuRoomId = Math.floor(Math.random() * 900) + 100;
 
-    const shipPlacementProofPlayer1 = await battleshipWaku.createGame(player1Address, proofPlayer1_converted, gameId);
+    const shipPlacementProofPlayer1 = await battleshipWaku.createGame(player1Address, proofPlayer1_converted, gameId, wakuRoomId);
     console.log("createGame txHash: ", shipPlacementProofPlayer1.hash);
 
     const shipPlacementProofPlayer2 = await battleshipWaku.JoinGame(player2Address, proofPlayer2_converted, gameId);

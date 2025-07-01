@@ -81,6 +81,7 @@ contract BattleshipWaku is Initializable, OwnableUpgradeable, UUPSUpgradeable {
 
     mapping(uint256 => Game) public games;
     uint256 public gameCount;
+    uint256[] public gameIds; // Array to track all game IDs
 
     event GameCreated(uint256 indexed gameId, address player1, uint256 player1BoardCommitment, uint256 player1MerkleRoot);
     event GameJoined(uint256 indexed gameId, address player2);
@@ -134,6 +135,7 @@ contract BattleshipWaku is Initializable, OwnableUpgradeable, UUPSUpgradeable {
         });
         newGame.player_hits[player1] = 0; 
         gameCount++;
+        gameIds.push(gameId);
 
         emit GameCreated(gameId, player1, shipPlacementProofPlayer1.pubSignals[0], shipPlacementProofPlayer1.pubSignals[1]);
     }
@@ -181,22 +183,40 @@ contract BattleshipWaku is Initializable, OwnableUpgradeable, UUPSUpgradeable {
         player2Hits = game.player_hits[game.player2];
     }
 
+    function getGameById(uint256 gameId) external view returns (GameView memory) {
+        Game storage game = games[gameId];
+        return GameView({
+            gameId: game.gameId,
+            wakuRoomId: game.wakuRoomId,
+            player1: game.player1,
+            player2: game.player2,
+            isActive: game.isActive,
+            playerTurn: game.playerTurn,
+            player1_board_commitment: game.player1_board_commitment,
+            player1_merkle_root: game.player1_merkle_root,
+            player2_board_commitment: game.player2_board_commitment,
+            player2_merkle_root: game.player2_merkle_root,
+            player1ShipPlacementProof: game.player1ShipPlacementProof,
+            player2ShipPlacementProof: game.player2ShipPlacementProof
+        });
+    }
+
     function getAllGames() external view returns (GameView[] memory) {
         GameView[] memory allGames = new GameView[](gameCount);
         for(uint256 i = 0; i < gameCount; i++) {
             allGames[i] = GameView({
-                gameId: games[i].gameId,
-                wakuRoomId: games[i].wakuRoomId,
-                player1: games[i].player1,
-                player2: games[i].player2,
-                isActive: games[i].isActive,
-                playerTurn: games[i].playerTurn,
-                player1_board_commitment: games[i].player1_board_commitment,
-                player1_merkle_root: games[i].player1_merkle_root,
-                player2_board_commitment: games[i].player2_board_commitment,
-                player2_merkle_root: games[i].player2_merkle_root,
-                player1ShipPlacementProof: games[i].player1ShipPlacementProof,
-                player2ShipPlacementProof: games[i].player2ShipPlacementProof
+                gameId: games[gameIds[i]].gameId,
+                wakuRoomId: games[gameIds[i]].wakuRoomId,
+                player1: games[gameIds[i]].player1,
+                player2: games[gameIds[i]].player2,
+                isActive: games[gameIds[i]].isActive,
+                playerTurn: games[gameIds[i]].playerTurn,
+                player1_board_commitment: games[gameIds[i]].player1_board_commitment,
+                player1_merkle_root: games[gameIds[i]].player1_merkle_root,
+                player2_board_commitment: games[gameIds[i]].player2_board_commitment,
+                player2_merkle_root: games[gameIds[i]].player2_merkle_root,
+                player1ShipPlacementProof: games[gameIds[i]].player1ShipPlacementProof,
+                player2ShipPlacementProof: games[gameIds[i]].player2ShipPlacementProof
             });
         }
         return allGames;
@@ -250,6 +270,16 @@ contract BattleshipWaku is Initializable, OwnableUpgradeable, UUPSUpgradeable {
         // Update the game state
         game.isActive = false;
         gameCount--;
+
+        // Remove game ID from the array
+        for(uint256 i = 0; i < gameIds.length; i++) {
+            if(gameIds[i] == gameId) {
+                // Replace with the last element and pop
+                gameIds[i] = gameIds[gameIds.length - 1];
+                gameIds.pop();
+                break;
+            }
+        }
 
         // Emit the game ended event
         emit GameEnded(gameId, winner);

@@ -47,9 +47,34 @@ const Page = () => {
         console.log(process.env.NEXT_PUBLIC_BATTLESHIP_CONTRACT_ADDRESS);
         console.log(battleshipWakuAbi.abi);
         const contract = await getContract(process.env.NEXT_PUBLIC_BATTLESHIP_CONTRACT_ADDRESS as string, battleshipWakuAbi.abi);
-        const games = await contract.getAllGames();
-        console.log(games);
-        setGames(games);
+        const games = await contract.getAllGames({
+          gasLimit: 500000
+        });
+        let parsedGames: any[] = [];
+        // If games is an array of arrays (each game is an array of values)
+        if (Array.isArray(games) && games.length > 0) {
+          parsedGames = games.map((game, index) => {
+            console.log({game});
+              if (Array.isArray(game)) {
+                  return {
+                      gameId: game[0],
+                      player1: game[1],
+                      player2: game[2],
+                      isActive: game[3],
+                      playerTurn: game[4],
+                      player1_board_commitment: game[5],
+                      player1_merkle_root: game[6],
+                      player2_board_commitment: game[7],
+                      player2_merkle_root: game[8],
+                      wakuRoomId: game[11],
+                      // Add the rest of the fields based on your GameView struct
+                  };
+              }
+              return game;
+          });
+          console.log("Parsed games:", parsedGames);
+        }
+        setGames(parsedGames);
       })();
       
     }, []);
@@ -77,7 +102,7 @@ const Page = () => {
 
           <div>
             {games.map((game) => (
-              <div key={game.gameId}>
+              <div key={Math.random().toString()}>
                 <h1>{game.gameId}</h1>
                 <h1>{game.player1}</h1>
                 <h1>{game.wakuRoomId}</h1>

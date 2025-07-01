@@ -60,26 +60,22 @@ async function main() {
 }
 /*
 Deploying contracts with the account: 0x2B27326d412efB3D03B142f4DEA2Dd3E53Dd7bB2
-Account balance: 299913004146469892
+Account balance: 239190769535213379
 
 1. Deploying verifier contracts...
-shipPlacementVerifier deployed to: 0x918438210985C9A5342E79F5eaaA9a19F47311df
-moveVerifier deployed to: 0xB9A662850efd18D6ffb6896cec1CbeA7c096c68e
-winVerifier deployed to: 0x5C50C69E03Db3aF87a4E30ceE3736b0D970bA41c
-
-2. Deploying BattleshipWaku as proxy...
-Deploying proxy with verifier addresses:
-- ShipPlacementVerifier: 0x918438210985C9A5342E79F5eaaA9a19F47311df
-- MoveVerifier: 0xB9A662850efd18D6ffb6896cec1CbeA7c096c68e
-- WinVerifier: 0x5C50C69E03Db3aF87a4E30ceE3736b0D970bA41c
-BattleshipWaku proxy deployed to: 0x16811dA60a5c16FAa40039a9bDa3B2e0B142e0d8
+ShipPlacementVerifier deployed to: 0x2E338F1F4e012D65b20cD8A6EF2cd443EAA6303B
+MoveVerifier deployed to: 0x686aFb63d1760A984675Df0B285bc6b0DEDC8F9A
+WinVerifier deployed to: 0xb0dCfe981BADfc1eEaC7b0Bcb51556c4c02E9D88
+Deploying BattleshipWaku...
+BattleshipWaku deployed to: 0xA4605f06ccbBf8Fe1204BCFf36DE5212Cb0855a1
 
 3. Verifying proxy deployment...
-Implementation deployed to: 0xA92ccFdBFb53B32e708445130f3F7836790cD5CD
+Implementation deployed to: 0x53E8360305537c3A73E27645778B588CE1e80377
 Admin address: 0x0000000000000000000000000000000000000000
 Contract owner: 0x2B27326d412efB3D03B142f4DEA2Dd3E53Dd7bB2
 
-✅ Deployment successful!
+
+ Deployment successful!
 */
 
 main()
