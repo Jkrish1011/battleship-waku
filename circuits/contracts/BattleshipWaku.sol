@@ -80,7 +80,6 @@ contract BattleshipWaku is Initializable, OwnableUpgradeable, UUPSUpgradeable {
     }
 
     mapping(uint256 => Game) public games;
-    uint256 public gameCount;
     uint256[] public gameIds; // Array to track all game IDs
 
     event GameCreated(uint256 indexed gameId, address player1, uint256 player1BoardCommitment, uint256 player1MerkleRoot);
@@ -133,8 +132,7 @@ contract BattleshipWaku is Initializable, OwnableUpgradeable, UUPSUpgradeable {
             pC: [uint256(0), uint256(0)],
             pubSignals: [uint256(0), uint256(0)]
         });
-        newGame.player_hits[player1] = 0; 
-        gameCount++;
+        newGame.player_hits[player1] = 0;
         gameIds.push(gameId);
 
         emit GameCreated(gameId, player1, shipPlacementProofPlayer1.pubSignals[0], shipPlacementProofPlayer1.pubSignals[1]);
@@ -202,8 +200,8 @@ contract BattleshipWaku is Initializable, OwnableUpgradeable, UUPSUpgradeable {
     }
 
     function getAllGames() external view returns (GameView[] memory) {
-        GameView[] memory allGames = new GameView[](gameCount);
-        for(uint256 i = 0; i < gameCount; i++) {
+        GameView[] memory allGames = new GameView[](gameIds.length);
+        for(uint256 i = 0; i < gameIds.length; i++) {
             allGames[i] = GameView({
                 gameId: games[gameIds[i]].gameId,
                 wakuRoomId: games[gameIds[i]].wakuRoomId,
@@ -269,7 +267,6 @@ contract BattleshipWaku is Initializable, OwnableUpgradeable, UUPSUpgradeable {
 
         // Update the game state
         game.isActive = false;
-        gameCount--;
 
         // Remove game ID from the array
         for(uint256 i = 0; i < gameIds.length; i++) {

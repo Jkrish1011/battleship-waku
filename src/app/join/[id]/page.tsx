@@ -10,6 +10,7 @@ const Page = () => {
     const searchParams = useParams();
     const queryParams = useSearchParams();
     const username = queryParams.get('username');
+    const gameId = queryParams.get('gameId');
     const roomId = searchParams.id as string;
 
     return (
@@ -20,7 +21,7 @@ const Page = () => {
                 Welcome, <span className="text-green-500">{username}</span> <br />
                 you have joined the room <span className="text-blue-500"> {roomId} </span>
             </div>
-            <Container player={Player.p2} roomId={roomId} />
+            <Container player={Player.p2} roomId={roomId} joinedOrCreated="joined" gameId={gameId} />
         </div>
         </ContentPairProvider>
     )

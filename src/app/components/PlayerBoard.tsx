@@ -10,6 +10,7 @@ import { getContract } from "../utils/gameUtils";
 import battleshipWakuAbi from "./../abi/BattleshipWaku.json" assert { type: "json" };
 import useWallet from "../store/useWallet";
 import Navbar from "./NavBar";
+import Image from "next/image";
 
 function PlayerBoard(props: { 
   latestMessage?: Message,
@@ -18,9 +19,11 @@ function PlayerBoard(props: {
   isLoading: boolean,
   error: any,
   encoder: any,
-  roomId: string
+  roomId: string,
+  joinedOrCreated: string,
+  gameId?: string
 }) {
-  const {node, encoder, isLoading, player, latestMessage, roomId} = props;
+  const {node, encoder, isLoading, player, latestMessage, roomId, joinedOrCreated, gameId} = props;
   const [wasmBuffer, setWasmBuffer] = useState<Uint8Array|null>(null);
   const [zkeyBuffer, setZkeyBuffer] = useState<Uint8Array|null>(null);
   const {address} = useWallet() as {address: string | null};
@@ -29,6 +32,9 @@ function PlayerBoard(props: {
   const [shipPlacement, setShipPlacement] = useState<number[][]>([]);
   const [ships, setShips] = useState<Ship[]>(SHIPS);
   const router = useRouter();
+  const [isLoadingProof, setIsLoadingProof] = useState(false);
+  const [txDetails, setTxDetails] = useState<any>(null);
+  const [txError, setTxError] = useState<string|null>(null);
   
   const doesShipExistOn = (rowIndex: number, colIndex: number, board: number[][]) => {
     return Boolean(board[rowIndex][colIndex])
@@ -91,50 +97,48 @@ function PlayerBoard(props: {
   const { push } = useLightPush({node, encoder});
 
   const sendReadyToPlay = async () => {
-    // 1. Check if all ships are placed
     if(!areAllShipsPlaced()) {
       alert('Please place all ships before sending ready to play message');
       return;
     }
-    console.log(ships);
-    console.log(board);
-    console.log(shipPlacement);
-
-    const gameGenerator = new BattleshipGameGenerator();
-    await gameGenerator.initialize();
-    const correctInput = await gameGenerator.generateCorrectInput(shipPlacement);
-    // console.log(correctInput);
-
-    // console.log(wasmBuffer);
-    // console.log(zkeyBuffer);
-
+    setIsLoadingProof(true);
+    setTxDetails(null);
+    setTxError(null);
+    let tx;
     try {
-      const proofPlayer1 = await gameGenerator.generateProof(correctInput, wasmBuffer as Uint8Array, zkeyBuffer as Uint8Array);
-      
-      // const provider = new ethers.JsonRpcProvider(process.env.RPC_URL as string);
+      const gameGenerator = new BattleshipGameGenerator();
+      await gameGenerator.initialize();
+      const correctInput = await gameGenerator.generateCorrectInput(shipPlacement);
+      const proofPlayer = await gameGenerator.generateProof(correctInput, wasmBuffer as Uint8Array, zkeyBuffer as Uint8Array);
       const battleshipWaku = await getContract(process.env.NEXT_PUBLIC_BATTLESHIP_CONTRACT_ADDRESS as string, battleshipWakuAbi.abi);
-        // Get the user's address from the signer
       const userAddress = address;
-      const gameId = gameGenerator.randomBytesCrypto(32);
-      console.log(battleshipWakuAbi);
-      console.log('Creating game with:');
-      console.log('Player address:', userAddress);
-      console.log('Game ID:', gameId);
-      console.log('Proof:', proofPlayer1);
-      console.log({roomId});
-      const tx = await battleshipWaku.createGame(userAddress, proofPlayer1, gameId, roomId, {
-        gasLimit: 5000000 // Adjust as needed
+      
+      if(joinedOrCreated === "created") {
+        let _gameId = gameId;
+        if(!_gameId) {
+          _gameId = gameGenerator.randomBytesCrypto(32);
+        } else {
+          _gameId = gameId;
+        }
+      tx = await battleshipWaku.createGame(userAddress, proofPlayer, _gameId, roomId, {
+        gasLimit: 5000000
       });
+      } else {
+        console.log("joining game");
+        tx = await battleshipWaku.JoinGame(userAddress, proofPlayer, gameId, {
+          gasLimit: 5000000
+        });
+      }
+      setTxDetails({ hash: tx.hash, status: 'pending' });
       await tx.wait();
-      console.log(tx);
-
-    } catch (error) {
+      setTxDetails({ hash: tx.hash, status: 'confirmed' });
+    } catch (error: any) {
+      setTxError(error?.message || 'Proof generation or transaction error');
+      setTxDetails(null);
       console.error('Proof generation error:', error);
-      // For now, just continue without proof generation
-      console.log('Continuing without proof generation...');
+    } finally {
+      setIsLoadingProof(false);
     }
-
-    // 2. Send the ready to play message
     await sendMessage(player, 'ready');
   }
 
@@ -305,57 +309,76 @@ function PlayerBoard(props: {
 
   return (
     <>
-    <div className="grid grid-cols-2 gap-4">
-      <div className="flex flex-col items-center space-y-2 mt-4">
-        {ships
-          .filter((ship) => !ship.placed)
-          .map((ship) => (
-            <button 
-              key={ship.id} 
-              onClick={() => handleShipSelection(ship)}
-              className="px-4 py-2 bg-blue-500 text-white font-bold rounded hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50"
-              >
-              Ship {ship.id} (Size: {ship.size}, {ship.orientation})
-            </button>
-          ))}
-      </div>
-      <div className="flex flex-col items-center space-y-2 mt-4">
-        <div className="board">
-          {board.map((row, rowIndex) => (
-            <div key={rowIndex} className="row">
-              {row.map((cell, colIndex) => (
-                <div
-                  key={colIndex}
-                  className={`cell ${cell === 1 ? "ship" : ""}`} // Use 'ship' class for cells with a ship
-                  onClick={() => {
-                    if (cell === 1) resetShipPlacement(rowIndex);
-                    else placeShipOnBoard(rowIndex, colIndex);
-                  }}
+    <div className="relative">
+      { isLoadingProof && (
+        <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black bg-opacity-40 w-full">
+          <Image src={`/shooting${joinedOrCreated === "created" ? "1" : "2"}.webp`} alt="Loading..." width={420} height={320} priority />
+          <span className="text-white mt-4 font-bold text-lg">Generating proof and sending transaction...</span>
+        </div>
+      )}
+      <div className={`grid grid-cols-2 gap-4 ${isLoadingProof ? 'pointer-events-none opacity-50' : ''}`}> 
+        <div className="flex flex-col items-center space-y-2 mt-4">
+          {ships
+            .filter((ship) => !ship.placed)
+            .map((ship) => (
+              <button 
+                key={ship.id} 
+                onClick={() => handleShipSelection(ship)}
+                className="px-4 py-2 bg-blue-500 text-white font-bold rounded hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50"
                 >
-                  {
-                    cell === 'X' && 'X'
-                  }
-                </div>
-              ))}
+                Ship {ship.id} (Size: {ship.size}, {ship.orientation})
+              </button>
+            ))}
+        </div>
+        <div className="flex flex-col items-center space-y-2 mt-4">
+          <div className="board">
+            {board.map((row, rowIndex) => (
+              <div key={rowIndex} className="row">
+                {row.map((cell, colIndex) => (
+                  <div
+                    key={colIndex}
+                    className={`cell ${cell === 1 ? "ship" : ""}`}
+                    onClick={() => {
+                      if (cell === 1) resetShipPlacement(rowIndex);
+                      else placeShipOnBoard(rowIndex, colIndex);
+                    }}
+                  >
+                    {cell === 'X' && 'X'}
+                  </div>
+                ))}
+              </div>
+            ))}
+            <div className="flex justify-between items-center w-full py-4">
+              <button 
+                onClick={handleReset}
+                className="px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white font-bold rounded focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-opacity-50"
+                >
+                reset
+              </button>
+              <button
+                onClick={sendReadyToPlay}
+                className={`px-6 py-2 font-bold text-lg rounded transition-colors duration-150 ${
+                  areAllShipsPlaced() ? 'bg-green-500 text-white hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-50' : 'bg-gray-500 text-gray-200 cursor-not-allowed'}`}
+                disabled={isLoadingProof}
+              >
+                Ready to play
+              </button>
             </div>
-          ))}
-          <div className="flex justify-between items-center w-full py-4">
-
-          <button 
-            onClick={handleReset}
-            className="px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white font-bold rounded focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-opacity-50"
-            >
-            reset
-            </button>
-            <button
-              onClick={sendReadyToPlay}
-              className={`px-6 py-2 font-bold text-lg rounded transition-colors duration-150 ${
-                areAllShipsPlaced() ? 'bg-green-500 text-white hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-50' : 'bg-gray-500 text-gray-200 cursor-not-allowed'}`}
-            >
-            Ready to play
-            </button>
           </div>
         </div>
+      </div>
+      {/* Transaction details section */}
+      <div className="mt-6 p-4 bg-gray-100 rounded shadow">
+        <h3 className="font-bold mb-2">Transaction Details</h3>
+        {txError && <div className="text-red-600">Error: {txError}</div>}
+        {txDetails ? (
+          <div>
+            <div><span className="font-semibold">Tx Hash:</span> <span className="break-all">{txDetails.hash}</span></div>
+            <div><span className="font-semibold">Status:</span> {txDetails.status}</div>
+          </div>
+        ) : (
+          <div className="text-gray-500">No transaction yet.</div>
+        )}
       </div>
     </div>
     </>

@@ -12,10 +12,12 @@ import { findLatestMessage } from "../utils";
 
 const Container = (props: {
     player: Player,
-    roomId?: string
+    roomId?: string,
+    joinedOrCreated: string,
+    gameId?: string
 }) => {
 
-    const {player, roomId} = props;
+    const {player, roomId, joinedOrCreated, gameId} = props;
     const [messages, setMessages] = useState<Message[]>();
     const [latestMessage, setLatestMessage] = useState<Message>();
 
@@ -60,6 +62,8 @@ const Container = (props: {
                 error={error}
                 encoder={encoder}
                 roomId={roomId || ''}
+                joinedOrCreated={joinedOrCreated}
+                gameId={gameId}
             />
 
             {

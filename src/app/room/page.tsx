@@ -69,10 +69,6 @@ const Page = () => {
       
     }, []);
 
-    useEffect(() => {
-      console.log({games});
-    }, [games]);
-
     return(
       <>
       <Navbar />
@@ -98,65 +94,70 @@ const Page = () => {
 
          
           <div>
-            <div className="text-center text-gray-500 my-2">
-              OR
-            </div>
-
-            <div className="flex flex-col items-center w-full max-w-4xl">
-              <div className="w-full max-h-96 overflow-y-auto border border-gray-300 rounded-lg bg-gray-50 p-4">
-                {games && games.map((game) => {
-                  return (
-                    <div key={game.gameId} className="mb-4 p-4 bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow">
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <h2 className="text-lg font-semibold text-gray-800">Game #{shorten(game.gameId.toString())}</h2>
-                          <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full">
-                            Room: {game.wakuRoomId.toString()}
-                          </span>
-                        </div>
-                        
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                          <div className="space-y-1">
-                            <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Player 1</label>
-                            <p className="text-sm text-gray-700 font-mono bg-gray-100 px-2 py-1 rounded">
-                              {game.player1.toString()}
-                            </p>
+           
+      
+            {games.length > 0 && (
+              <>
+                <div className="text-center text-gray-500 my-2">
+                  OR
+                </div>
+                <div className="flex flex-col items-center w-full max-w-4xl">
+                  <div className="w-full max-h-96 overflow-y-auto border border-gray-300 rounded-lg bg-gray-50 p-4">
+                    {games && games.map((game) => {
+                      return (
+                        <div key={game.gameId} className="mb-4 p-4 bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow">
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <h2 className="text-lg font-semibold text-gray-800">Game #{shorten(game.gameId.toString())}</h2>
+                              <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full">
+                                Room: {game.wakuRoomId.toString()}
+                              </span>
+                            </div>
+                            
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                              <div className="space-y-1">
+                                <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Player 1</label>
+                                <p className="text-sm text-gray-700 font-mono bg-gray-100 px-2 py-1 rounded">
+                                  {game.player1.toString()}
+                                </p>
+                              </div>
+                              
+                              <div className="space-y-1">
+                                <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Board Commitment</label>
+                                <p className="text-xs text-gray-600 font-mono bg-gray-100 px-2 py-1 rounded truncate">
+                                  {game.player1_board_commitment}
+                                </p>
+                              </div>
+                              
+                              <div className="space-y-1">
+                                <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Merkle Root</label>
+                                <p className="text-xs text-gray-600 font-mono bg-gray-100 px-2 py-1 rounded truncate">
+                                  {game.player1_merkle_root}
+                                </p>
+                              </div>
+                            </div>
+                            
+                            <div className="pt-2">
+                              <button
+                                className={`w-full px-4 py-2 rounded-md text-white font-medium transition-colors ${
+                                !Boolean(username) 
+                                    ? 'bg-gray-400 cursor-not-allowed' 
+                                    : 'bg-green-500 hover:bg-green-600 active:bg-green-700'
+                                }`}
+                                disabled={!Boolean(username)}
+                                onClick={() => {router.push(`/join/${game.wakuRoomId.toString()}?username=${username}&gameId=${game.gameId.toString()}`)}}
+                              >
+                                Join this room
+                              </button>
+                            </div>
                           </div>
-                          
-                          <div className="space-y-1">
-                            <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Board Commitment</label>
-                            <p className="text-xs text-gray-600 font-mono bg-gray-100 px-2 py-1 rounded truncate">
-                              {game.player1_board_commitment}
-                            </p>
-                          </div>
-                          
-                          <div className="space-y-1">
-                            <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Merkle Root</label>
-                            <p className="text-xs text-gray-600 font-mono bg-gray-100 px-2 py-1 rounded truncate">
-                              {game.player1_merkle_root}
-                            </p>
-                          </div>
                         </div>
-                        
-                        <div className="pt-2">
-                          <button
-                            className={`w-full px-4 py-2 rounded-md text-white font-medium transition-colors ${
-                            !Boolean(username) 
-                                ? 'bg-gray-400 cursor-not-allowed' 
-                                : 'bg-green-500 hover:bg-green-600 active:bg-green-700'
-                            }`}
-                            disabled={!Boolean(username)}
-                            onClick={() => {router.push(`/join/${game.wakuRoomId.toString()}?username=${username}`)}}
-                          >
-                            Join this room
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
+                      )
+                    })}
+                  </div>
+                </div>
+            </>
+            )}
           </div>
         </div>
         </>

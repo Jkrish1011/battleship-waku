@@ -28,7 +28,7 @@ const Page = () => {
                 Share this room ID with your friend to start playing now
             </div>
 
-            <Container player={Player.p1} roomId={roomId} />
+            <Container player={Player.p1} roomId={roomId} joinedOrCreated="created" />
             </div>
         </ContentPairProvider>
     )
