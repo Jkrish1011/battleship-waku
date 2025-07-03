@@ -5,6 +5,8 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { LightNodeProvider } from "@waku/react";
 import { Protocols } from "@waku/sdk";
+import { ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -23,7 +25,10 @@ export default function RootLayout({
     protocols={[Protocols.Filter, Protocols.LightPush]}
     >
     <html lang="en">
-      <body className={inter.className}>{children}</body>
+      <body className={inter.className}>
+        <ToastContainer />
+        {children}
+      </body>
     </html>
     </LightNodeProvider>
   );

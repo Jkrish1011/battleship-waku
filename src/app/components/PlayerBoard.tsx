@@ -9,8 +9,8 @@ import { BattleshipGameGenerator } from "./helpers/gameGenerator";
 import { getContract } from "../utils/gameUtils";
 import battleshipWakuAbi from "./../abi/BattleshipWaku.json" assert { type: "json" };
 import useWallet from "../store/useWallet";
-import Navbar from "./NavBar";
 import Image from "next/image";
+import { toast } from "react-toastify";
 
 function PlayerBoard(props: { 
   latestMessage?: Message,
@@ -25,6 +25,7 @@ function PlayerBoard(props: {
 }) {
   const {node, encoder, isLoading, player, latestMessage, roomId, joinedOrCreated, gameId} = props;
   const [wasmBuffer, setWasmBuffer] = useState<Uint8Array|null>(null);
+  const [isReadyToPlay, setIsReadyToPlay] = useState(false);
   const [zkeyBuffer, setZkeyBuffer] = useState<Uint8Array|null>(null);
   const {address} = useWallet() as {address: string | null};
   const [board, setBoard] = useState(createBoard());
@@ -35,6 +36,9 @@ function PlayerBoard(props: {
   const [isLoadingProof, setIsLoadingProof] = useState(false);
   const [txDetails, setTxDetails] = useState<any>(null);
   const [txError, setTxError] = useState<string|null>(null);
+  const [proofPlayer, setProofPlayer] = useState<any>(null);
+  const [calldataPlayer, setCalldataPlayer] = useState<any>(null);
+  const [verificationJson, setVerificationJson] = useState<string|null>(null);
   
   const doesShipExistOn = (rowIndex: number, colIndex: number, board: number[][]) => {
     return Boolean(board[rowIndex][colIndex])
@@ -78,10 +82,12 @@ function PlayerBoard(props: {
     Promise.all([
       fetch("/shipPlacement/ship_placement.wasm").then(r => r.arrayBuffer()).then(buffer => new Uint8Array(buffer)),
       fetch("/shipPlacement/ship_placement_final.zkey").then(r => r.arrayBuffer()).then(buffer => new Uint8Array(buffer)),
+      fetch("/shipPlacement/ship_verification_key.json").then(r => r.json()),
     ])
-    .then(([wasm, zkey]) => {
+    .then(([wasm, zkey, verificationJson]) => {
       setWasmBuffer(wasm);
       setZkeyBuffer(zkey);
+      setVerificationJson(verificationJson);
     })
     .catch(err => {
       console.error("failed to load wasm or zkey:", err);
@@ -96,20 +102,44 @@ function PlayerBoard(props: {
 
   const { push } = useLightPush({node, encoder});
 
+  const verifyProofs = async () => {
+    const gameGenerator = new BattleshipGameGenerator();
+    await gameGenerator.initialize();
+    const isValid = await gameGenerator.verifyProof(verificationJson, proofPlayer);
+    console.log("isValid", isValid);
+    if(isValid) {
+      toast.success("Proof verified");
+    } else {
+      toast.error("Proof verification failed");
+    }
+    return isValid;
+  }
+
   const sendReadyToPlay = async () => {
     if(!areAllShipsPlaced()) {
       alert('Please place all ships before sending ready to play message');
       return;
     }
-    setIsLoadingProof(true);
+    if(!calldataPlayer) {
+      alert('Please generate board proof before sending ready to play message');
+      return;
+    }
+    await joinGame();
+    await sendMessage(player, 'ready');
+  }
+
+  const joinGame = async () => {
+    if(!areAllShipsPlaced()) {
+      alert('Please place all ships before joining game');
+      return;
+    }
+
+    let tx;
     setTxDetails(null);
     setTxError(null);
-    let tx;
-    try {
+    try{
       const gameGenerator = new BattleshipGameGenerator();
       await gameGenerator.initialize();
-      const correctInput = await gameGenerator.generateCorrectInput(shipPlacement);
-      const proofPlayer = await gameGenerator.generateProof(correctInput, wasmBuffer as Uint8Array, zkeyBuffer as Uint8Array);
       const battleshipWaku = await getContract(process.env.NEXT_PUBLIC_BATTLESHIP_CONTRACT_ADDRESS as string, battleshipWakuAbi.abi);
       const userAddress = address;
       
@@ -120,28 +150,47 @@ function PlayerBoard(props: {
         } else {
           _gameId = gameId;
         }
-      tx = await battleshipWaku.createGame(userAddress, proofPlayer, _gameId, roomId, {
+      tx = await battleshipWaku.createGame(userAddress, calldataPlayer, _gameId, roomId, {
         gasLimit: 5000000
       });
       } else {
         console.log("joining game");
-        tx = await battleshipWaku.JoinGame(userAddress, proofPlayer, gameId, {
+        tx = await battleshipWaku.JoinGame(userAddress, calldataPlayer, gameId, {
           gasLimit: 5000000
         });
       }
       setTxDetails({ hash: tx.hash, status: 'pending' });
       await tx.wait();
       setTxDetails({ hash: tx.hash, status: 'confirmed' });
-    } catch (error: any) {
+    }catch(error: any){
       setTxError(error?.message || 'Proof generation or transaction error');
       setTxDetails(null);
+      console.error('Error joining game:', error);
+    }
+  }
+
+  const generateBoardProof = async () => {
+    if(!areAllShipsPlaced()) {
+      alert('Please place all ships before generating board proof');
+      return;
+    }
+
+    setIsLoadingProof(true);
+    try {
+      const gameGenerator = new BattleshipGameGenerator();
+      await gameGenerator.initialize();
+      const correctInput = await gameGenerator.generateCorrectInput(shipPlacement);
+      const {proof: _proofPlayer, calldata: _calldataPlayer} = await gameGenerator.generateProof(correctInput, wasmBuffer as Uint8Array, zkeyBuffer as Uint8Array);
+      setProofPlayer(_proofPlayer);
+      setCalldataPlayer(_calldataPlayer);
+    } catch (error: any) {
+      setTxError(error?.message || 'Proof generation or transaction error');
       console.error('Proof generation error:', error);
     } finally {
       setIsLoadingProof(false);
+      setIsReadyToPlay(true);
     }
-    await sendMessage(player, 'ready');
   }
-
 
   const respondToMove = async (move:string) => {
     const rowIndex = parseInt(move.split(',')[0]);
@@ -348,18 +397,26 @@ function PlayerBoard(props: {
                 ))}
               </div>
             ))}
-            <div className="flex justify-between items-center w-full py-4">
+            <div className="flex flex-col justify-center items-center w-full py-4 gap-4">
               <button 
                 onClick={handleReset}
                 className="px-4 py-2 bg-gray-500 hover:bg-gray-600 text-white font-bold rounded focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-opacity-50"
                 >
-                reset
+                Reset Board
+              </button>
+              <button
+                onClick={generateBoardProof}
+                className={`px-6 py-2 font-bold rounded transition-colors duration-150 ${
+                  areAllShipsPlaced() ? 'bg-green-500 text-white hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-50' : 'bg-gray-500 text-gray-200 cursor-not-allowed'}`}
+                
+              >
+                Generate Board Proof
               </button>
               <button
                 onClick={sendReadyToPlay}
-                className={`px-6 py-2 font-bold text-lg rounded transition-colors duration-150 ${
-                  areAllShipsPlaced() ? 'bg-green-500 text-white hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-50' : 'bg-gray-500 text-gray-200 cursor-not-allowed'}`}
-                disabled={isLoadingProof}
+                className={`px-6 py-2 font-bold rounded transition-colors duration-150 ${
+                  isReadyToPlay ? 'bg-green-500 text-white hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-50' : 'bg-gray-500 text-gray-200 cursor-not-allowed'}`}
+                
               >
                 Ready to play
               </button>
@@ -367,6 +424,33 @@ function PlayerBoard(props: {
           </div>
         </div>
       </div>
+      {/* Proof container */}
+      {calldataPlayer && (
+      <div id="proof-container" className="mt-8 p-4 bg-gray-50 rounded-lg border border-gray-200">
+        <div className="space-y-4">
+          <h3 className="font-bold mb-2">Your Board Proof</h3>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Proof</label>
+            <textarea id="proof" className="w-full h-40 p-3 bg-gray-100 rounded font-mono text-sm resize-y" readOnly>
+              {
+                (() => {
+                  const _p = {
+                    pA: calldataPlayer[0].toString(),
+                    pB: calldataPlayer[1].toString(),
+                    pC: calldataPlayer[2].toString(),
+                    publicInput: calldataPlayer[3].toString(),
+                  };
+                  return JSON.stringify(_p, null, 2);
+                })()
+              }
+            </textarea>
+          </div>
+          <button id="verifyProofs" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded transition-colors" onClick={verifyProofs}>
+            Verify Proof In-Browser
+          </button>
+        </div>
+      </div>
+      )}
       {/* Transaction details section */}
       <div className="mt-6 p-4 bg-gray-100 rounded shadow">
         <h3 className="font-bold mb-2">Transaction Details</h3>

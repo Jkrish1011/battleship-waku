@@ -285,9 +285,15 @@ class BattleshipGameGenerator {
     
     async generateProof(input, wasmContent, zkeyContent) {
         const proof = await snarkjs.groth16.fullProve(input, wasmContent, zkeyContent);
+        console.log("proof", proof);
         const calldataStr = await snarkjs.groth16.exportSolidityCallData(proof.proof, proof.publicSignals);
         const calldata = JSON.parse("[" + calldataStr + "]");
-        return calldata;
+        return {calldata, proof};
+    }
+
+    async verifyProof(verificationKeyPath, proof) {
+        const isValid = await snarkjs.groth16.verify(verificationKeyPath, proof.publicSignals, proof.proof);
+        return isValid;
     }
 
     toHex(decimal) {

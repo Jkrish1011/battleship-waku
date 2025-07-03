@@ -10,6 +10,8 @@ const { BattleshipGameGenerator } = require("./helpers/gameGenerator");
 const fs = require("fs");
 const path = require("path");
 
+const verificationKeyJson = require("../keys/ship_verification_key.json");
+
 describe("BattleshipWakuGame", function () {
   async function deployWordleAppFixture() {
     const gameGenerator = new BattleshipGameGenerator();
@@ -102,6 +104,7 @@ describe("BattleshipWakuGame", function () {
 
     const wasmPath = path.join(__dirname, "..", "build", "ship_placement", "ship_placement_js", "ship_placement.wasm");
     const zkeyPath = path.join(__dirname, "..", "keys", "ship_placement_final.zkey");
+    const verificationKeyPath = path.join(__dirname, "..", "keys", "ship_verification_key.json");
     if (!fs.existsSync(wasmPath)) {
       throw new Error(`WASM file not found at: ${wasmPath}`);
     }
@@ -109,27 +112,37 @@ describe("BattleshipWakuGame", function () {
     if (!fs.existsSync(zkeyPath)) {
         throw new Error(`zkey file not found at: ${zkeyPath}`);
     }
+    if (!fs.existsSync(verificationKeyPath)) {
+      throw new Error(`verification file not found at: ${verificationKeyPath}`);
+    }
     console.log("wasmPath", wasmPath);
     console.log("zkeyPath", zkeyPath);
+    console.log("verificationKeyPath", verificationKeyPath);
+
+    const verification = fs.readFileSync(verificationKeyPath);
     // const wasmBuffer = fs.readFileSync(wasmPath);
     // const zkeyBuffer = fs.readFileSync(zkeyPath);
     // console.log("WASM buffer size:", wasmBuffer.length);
     // console.log("zkey buffer size:", zkeyBuffer.length);
     console.log("--");
 
-    const proofPlayer1 = await gameGenerator.generateProof(shipPlacementPositionsPlayer1, wasmPath, zkeyPath);
+    const {proof, calldata} = await gameGenerator.generateProof(shipPlacementPositionsPlayer1, wasmPath, zkeyPath);
     // console.log(proofPlayer1);
     const proofPlayer1_converted = {
-      pA: proofPlayer1[0],
-      pB: proofPlayer1[1],
-      pC: proofPlayer1[2],
-      pubSignals: proofPlayer1[3]
+      pA: calldata[0],
+      pB: calldata[1],
+      pC: calldata[2],
+      pubSignals: calldata[3]
     };
+    
+    console.log("proofPlayer1", calldata);
+    let offchainVerification = await gameGenerator.verifyProof(verificationKeyJson, proof);
+    console.log("Offchain verification proof", offchainVerification);
     
     let result = await shipPlacementVerifier.verifyProof(proofPlayer1_converted.pA, proofPlayer1_converted.pB, proofPlayer1_converted.pC, proofPlayer1_converted.pubSignals);
     console.log("result", result);
 
-    const proofPlayer2 = await gameGenerator.generateProof(shipPlacementPositionsPlayer2, wasmPath, zkeyPath);
+    const {proof: _proofPlayer2, calldata: proofPlayer2} = await gameGenerator.generateProof(shipPlacementPositionsPlayer2, wasmPath, zkeyPath);
     const proofPlayer2_converted = {
       pA: proofPlayer2[0],
       pB: proofPlayer2[1],
@@ -187,7 +200,7 @@ describe("BattleshipWakuGame", function () {
         guess_y: guessPlayer1[1],
         hit: hit
       };
-      const proofMovePlayer1 = await gameGenerator.generateProof(moveInputPlayer1, moveWasmPath, moveZkeyPath);
+      const {proof: _proofMovePlayer1, calldata: proofMovePlayer1} = await gameGenerator.generateProof(moveInputPlayer1, moveWasmPath, moveZkeyPath);
       // console.log(proofPlayer1);
       const proofMovePlayer1_converted = {
         pA: proofMovePlayer1[0],
@@ -197,7 +210,6 @@ describe("BattleshipWakuGame", function () {
       };
     
       let resultMovePlayer1 = await moveVerifier.verifyProof(proofMovePlayer1_converted.pA, proofMovePlayer1_converted.pB, proofMovePlayer1_converted.pC, proofMovePlayer1_converted.pubSignals);
-      
 
       // Connect the contract to player1
       const battleshipWakuWithPlayer1 = battleshipWaku.connect(player1);
@@ -218,7 +230,7 @@ describe("BattleshipWakuGame", function () {
           guess_y: guessPlayer2[1],
           hit: hit2
         };
-        const proofMovePlayer2 = await gameGenerator.generateProof(moveInputPlayer2, moveWasmPath, moveZkeyPath);
+        const {proof: _proofMovePlayer2, calldata: proofMovePlayer2} = await gameGenerator.generateProof(moveInputPlayer2, moveWasmPath, moveZkeyPath);
         // console.log(proofPlayer1);
         const proofMovePlayer2_converted = {
           pA: proofMovePlayer2[0],
@@ -261,7 +273,7 @@ describe("BattleshipWakuGame", function () {
       hits: player2ShipPositions,
     }
 
-    const proofWinPlayer1 = await gameGenerator.generateProof(winInputPlayer1, winWasmPath, winZkeyPath);
+    const {proof: _proofWinPlayer1, calldata: proofWinPlayer1} = await gameGenerator.generateProof(winInputPlayer1, winWasmPath, winZkeyPath);
     const proofWinPlayer1_converted = {
       pA: proofWinPlayer1[0],
       pB: proofWinPlayer1[1],
@@ -325,7 +337,7 @@ describe("BattleshipWakuGame", function () {
     // console.log("zkey buffer size:", zkeyBuffer.length);
     console.log("--");
 
-    const proofPlayer1 = await gameGenerator.generateProof(shipPlacementPositionsPlayer1, wasmPath, zkeyPath);
+    const {proof: _proofPlayer1, calldata: proofPlayer1} = await gameGenerator.generateProof(shipPlacementPositionsPlayer1, wasmPath, zkeyPath);
     // console.log(proofPlayer1);
     const proofPlayer1_converted = {
       pA: proofPlayer1[0],
@@ -337,7 +349,7 @@ describe("BattleshipWakuGame", function () {
     let result = await shipPlacementVerifier.verifyProof(proofPlayer1_converted.pA, proofPlayer1_converted.pB, proofPlayer1_converted.pC, proofPlayer1_converted.pubSignals);
     console.log("result", result);
 
-    const proofPlayer2 = await gameGenerator.generateProof(shipPlacementPositionsPlayer2, wasmPath, zkeyPath);
+    const {proof: _proofPlayer2, calldata: proofPlayer2} = await gameGenerator.generateProof(shipPlacementPositionsPlayer2, wasmPath, zkeyPath);
     const proofPlayer2_converted = {
       pA: proofPlayer2[0],
       pB: proofPlayer2[1],
@@ -378,7 +390,7 @@ describe("BattleshipWakuGame", function () {
       hits: player2ShipPositions,
     }
 
-    const proofWinPlayer1 = await gameGenerator.generateProof(winInputPlayer1, winWasmPath, winZkeyPath);
+    const {proof: _proofWinPlayer1, calldata: proofWinPlayer1} = await gameGenerator.generateProof(winInputPlayer1, winWasmPath, winZkeyPath);
     const proofWinPlayer1_converted = {
       pA: proofWinPlayer1[0],
       pB: proofWinPlayer1[1],
