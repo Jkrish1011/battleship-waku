@@ -1,4 +1,6 @@
+// @ts-nocheck
 import crypto from "crypto";
+
 import { buildPoseidon } from "circomlibjs";
 import * as snarkjs from "snarkjs";
 

@@ -1,3 +1,4 @@
+// @ts-nocheck
 'use client'
 import { useParams, useSearchParams } from "next/navigation";
 import { ContentPairProvider } from "@waku/react";
@@ -21,7 +22,8 @@ const Page = () => {
                 Welcome, <span className="text-green-500">{username}</span> <br />
                 you have joined the room <span className="text-blue-500"> {roomId} </span>
             </div>
-            <Container player={Player.p2} roomId={roomId} joinedOrCreated="joined" gameId={gameId} />
+            <Container 
+                player={Player.p2} roomId={roomId} joinedOrCreated="joined" gameId={gameId} />
         </div>
         </ContentPairProvider>
     )

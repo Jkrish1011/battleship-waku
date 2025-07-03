@@ -10,4 +10,5 @@ export type Message = {
   id: any;
   move?: string;
   hit?: string;
+  proof?: string;
 };

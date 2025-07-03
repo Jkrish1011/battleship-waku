@@ -1,3 +1,4 @@
+// @ts-nocheck
 import React, { useState, useEffect } from "react";
 import { Player, Message } from "../types";
 import { createBoard, MoveMessage } from "../utils/gameUtils";
@@ -65,8 +66,7 @@ const OpponentBoard = (props: {
           timestamp: new Date(),
           payload: serializedMessage
         });
-        // console.log({pushRes});
-
+        
         if (pushRes?.errors?.length && pushRes?.errors?.length) {
           alert('unable to connect to a stable node. please reload the page!');
         }

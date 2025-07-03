@@ -21,9 +21,10 @@ function PlayerBoard(props: {
   encoder: any,
   roomId: string,
   joinedOrCreated: string,
-  gameId?: string
+  gameId?: string,
+  opponentProofs?: Message | null
 }) {
-  const {node, encoder, isLoading, player, latestMessage, roomId, joinedOrCreated, gameId} = props;
+  const {node, encoder, isLoading, player, latestMessage, roomId, joinedOrCreated, gameId, opponentProofs} = props;
   const [wasmBuffer, setWasmBuffer] = useState<Uint8Array|null>(null);
   const [isReadyToPlay, setIsReadyToPlay] = useState(false);
   const [zkeyBuffer, setZkeyBuffer] = useState<Uint8Array|null>(null);
@@ -446,6 +447,26 @@ function PlayerBoard(props: {
             </textarea>
           </div>
           <button id="verifyProofs" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded transition-colors" onClick={verifyProofs}>
+            Verify Proof In-Browser
+          </button>
+        </div>
+      </div>
+      )}
+      {opponentProofs && (
+      <div id="proof-container" className="mt-8 p-4 bg-gray-50 rounded-lg border border-gray-200">
+        <div className="space-y-4">
+          <h3 className="font-bold mb-2">Opponent Board Proof</h3>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Proof</label>
+            <textarea id="proof" className="w-full h-40 p-3 bg-gray-100 rounded font-mono text-sm resize-y" readOnly>
+              {
+                (() => {
+                  return JSON.stringify(opponentProofs, null, 2);
+                })()
+              }
+            </textarea>
+          </div>
+          <button id="verifyProofs" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded transition-colors">
             Verify Proof In-Browser
           </button>
         </div>

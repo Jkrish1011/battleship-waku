@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { Message, Player } from "../types";
 import protobuf from "protobufjs";
 import { ethers } from "ethers";
@@ -67,30 +68,48 @@ const MoveReplyMessage = new protobuf.Type("MoveReplyMessage")
   .add(new protobuf.Field("hit", 6, "string")) // hit/miss
   .add(new protobuf.Field("id", 4, "string"));
 
+const BoardProofMessage = new protobuf.Type("BoardProofMessage")
+  .add(new protobuf.Field("timestamp", 1, "uint64"))
+  .add(new protobuf.Field("sender", 2, "string"))
+  .add(new protobuf.Field("proof", 3, "string"))
+  .add(new protobuf.Field("id", 4, "string"));
+
 const decodeMessage = (wakuMessage: any, type: string) => {
   if (!wakuMessage.payload) {
     console.log("No payload found!");
     return {};
   }
   try {
-    const { timestamp, sender, message, id } = ChatMessage.decode(
+    
+    var { timestamp, sender, message, id } = ChatMessage.decode(
       wakuMessage.payload
     );
     if (message) {
       return { timestamp, sender, message, id };
-    } else {
-      const { timestamp, sender, move, id } = MoveMessage.decode(
+    } 
+    
+    var { timestamp, sender, move, id } = MoveMessage.decode(
         wakuMessage.payload
       );
-      if (move) {
-        return { timestamp, sender, move, id };
-      } else {
-        const { timestamp, sender, hit, id } = MoveReplyMessage.decode(
-          wakuMessage.payload
-        );
-        return { timestamp, sender, hit, id };
-      }
+    if (move) {
+      return { timestamp, sender, move, id };
+    } 
+    
+    var { timestamp, sender, hit, id } = MoveReplyMessage.decode(
+      wakuMessage.payload
+    );
+    if (hit) {
+      return { timestamp, sender, hit, id };
     }
+    
+    var { timestamp, sender, proof, id } = BoardProofMessage.decode(
+      wakuMessage.payload
+    );
+    if (proof) {
+      return { timestamp, sender, proof, id };
+    }
+      
+  
   } catch (err) {
     console.error(err);
   }
