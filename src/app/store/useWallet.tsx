@@ -119,4 +119,10 @@ const useWallet = create((set, get) => ({
   }
 }));
 
-export default useWallet;
+// const useGames = create((set, get) => ({
+//   games: null,
+//   setGames: (games: any[]) => set({ games }),
+//   getGames: () => get().games as any[],
+// }));
+
+export { useWallet };

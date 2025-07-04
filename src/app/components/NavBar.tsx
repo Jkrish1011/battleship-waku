@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import useWallet from '../store/useWallet';
+import { useWallet } from '../store/useWallet';
 
 const NavBar = () => {
     const { 

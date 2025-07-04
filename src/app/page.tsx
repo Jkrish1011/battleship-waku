@@ -2,7 +2,7 @@
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import NavBar from "./components/NavBar";
-import useWallet from "./store/useWallet";
+import { useWallet } from "./store/useWallet";
 
 export default function Home() {
 

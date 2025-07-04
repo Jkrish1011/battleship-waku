@@ -1,8 +1,9 @@
+// @ts-nocheck
 'use client'
 
 import { useRouter } from "next/navigation";
 import React, { useEffect, useState } from "react";
-import useWallet from "../store/useWallet";
+import { useWallet } from "../store/useWallet";
 import battleshipWakuAbi from "./../abi/BattleshipWaku.json" assert { type: "json" };
 import { getContract, shorten } from "../utils/gameUtils";
 import Navbar from "../components/NavBar";
@@ -28,37 +29,40 @@ function generateThreeDigitNumber(): number {
 
 const Page = () => {
     const [username, setUsername] = useState<string>('');
+    const { address } = useWallet();
     const [games, setGames] = useState<any[]>([]);
     const router = useRouter();
 
     useEffect(() => {
       (async () => {
         const contract = await getContract(process.env.NEXT_PUBLIC_BATTLESHIP_CONTRACT_ADDRESS as string, battleshipWakuAbi.abi);
-        const games = await contract.getAllGames({
+        const gamesContract = await contract.getAllGames({
           gasLimit: 500000
         });
         let parsedGames: any[] = [];
         // If games is an array of arrays (each game is an array of values)
-        if (Array.isArray(games) && games.length > 0) {
-          parsedGames = games.map((game, index) => {
+        if (Array.isArray(gamesContract) && gamesContract.length > 0) {
+          parsedGames = gamesContract.map((game, index) => {
               if (Array.isArray(game)) {
                   return {
-                      gameId: game[0],
-                      player1: game[1],
-                      player2: game[2],
-                      isActive: game[3],
-                      playerTurn: game[4],
-                      player1_board_commitment: game[5],
-                      player1_merkle_root: game[6],
-                      player2_board_commitment: game[7],
-                      player2_merkle_root: game[8],
-                      wakuRoomId: game[11],
+                      gameId: game[0].toString(),
+                      player1: game[1].toString(),
+                      player2: game[2].toString(),
+                      isActive: game[3].toString(),
+                      playerTurn: game[4].toString(),
+                      player1_board_commitment: game[5].toString(),
+                      player1_merkle_root: game[6].toString(),
+                      player2_board_commitment: game[7].toString(),
+                      player2_merkle_root: game[8].toString(),
+                      wakuRoomId: game[11].toString(),
                       // Add the rest of the fields based on your GameView struct
                   };
               }
               return game;
           });
         }
+        console.log({parsedGames});
+        localStorage.setItem('games', JSON.stringify(parsedGames));
         setGames(parsedGames);
       })();
       
@@ -93,7 +97,7 @@ const Page = () => {
                 <div className="text-center text-gray-500 my-2">
                   OR
                 </div>
-                <div className="flex flex-col items-center w-full max-w-4xl">
+                <div className="flex flex-col items-center w-full max-w-6xl">
                   <div className="w-full max-h-96 overflow-y-auto border border-gray-300 rounded-lg bg-gray-50 p-4">
                     {games && games.map((game) => {
                       return (
@@ -137,9 +141,15 @@ const Page = () => {
                                     : 'bg-green-500 hover:bg-green-600 active:bg-green-700'
                                 }`}
                                 disabled={!Boolean(username)}
-                                onClick={() => {router.push(`/join/${game.wakuRoomId.toString()}?username=${username}&gameId=${game.gameId.toString()}`)}}
+                                onClick={() => {
+                                  if(game.player1.toLowerCase() === address.toLowerCase()) {
+                                    router.push(`/room/${game.wakuRoomId.toString()}?username=${username}`)
+                                  } else {
+                                    router.push(`/join/${game.wakuRoomId.toString()}?username=${username}&gameId=${game.gameId.toString()}`)
+                                  }
+                                }}
                               >
-                                Join this room
+                                Join {game.player1.toLowerCase() == address.toLowerCase() ? 'back to your game' : 'this room'}
                               </button>
                             </div>
                           </div>

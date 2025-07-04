@@ -8,7 +8,7 @@ import { useLightPush } from "@waku/react";
 import { BattleshipGameGenerator } from "./helpers/gameGenerator";
 import { getContract } from "../utils/gameUtils";
 import battleshipWakuAbi from "./../abi/BattleshipWaku.json" assert { type: "json" };
-import useWallet from "../store/useWallet";
+import { useWallet } from "../store/useWallet";
 import Image from "next/image";
 import { toast } from "react-toastify";
 
@@ -42,6 +42,7 @@ function PlayerBoard(props: {
   const [calldataPlayer, setCalldataPlayer] = useState<any>(null);
   const [verificationJson, setVerificationJson] = useState<string|null>(null);
   const [shipsLocal, setShipsLocal] = useState<Ship[]>(localShips || []);
+  const [games, setGames] = useState<any[]>([]);
   
   const doesShipExistOn = (rowIndex: number, colIndex: number, board: number[][]) => {
     return Boolean(board[rowIndex][colIndex])
@@ -99,11 +100,47 @@ function PlayerBoard(props: {
 
   // Replace the ships if found in the localStorage
   useEffect(() => {
+    console.log({shipsLocal});
     if(shipsLocal != null) {
       for(let i=0; i < shipsLocal.length; i++) {
         const currShip = shipsLocal[i];
         placeShipOnBoardWithShip(currShip.x, currShip.y, currShip);
       }
+    }
+  }, [shipsLocal]);
+
+  useEffect(() => {
+    if (localShips) {
+      setShipsLocal(localShips);
+    }
+  }, [localShips]);
+
+  useEffect(() => {
+    const _games = localStorage.getItem('games');
+    if(_games !== null && _games !== undefined && _games !== '') {
+      let parsedGames: any[] = [];
+      let _gamesParsed = JSON.parse(_games);
+      if (Array.isArray(_gamesParsed) && _gamesParsed.length > 0) {
+        parsedGames = _gamesParsed.map((game, index) => {
+            if (Array.isArray(game)) {
+                return {
+                    gameId: game[0],
+                    player1: game[1],
+                    player2: game[2],
+                    isActive: game[3],
+                    playerTurn: game[4],
+                    player1_board_commitment: game[5],
+                    player1_merkle_root: game[6],
+                    player2_board_commitment: game[7],
+                    player2_merkle_root: game[8],
+                    wakuRoomId: game[11],
+                    // Add the rest of the fields based on your GameView struct
+                };
+            }
+            return game;
+        });
+      }
+      setGames(parsedGames);
     }
   }, []);
 
@@ -137,7 +174,16 @@ function PlayerBoard(props: {
       alert('Please generate board proof before sending ready to play message');
       return;
     }
-    await joinGame();
+    if(games.length > 0) {
+      for(let i=0; i < games.length; i++) {
+        const game = games[i];
+        if(game.gameId === gameId && game.isActive === false) {
+          await joinGame();
+        } else {
+          toast.success("You had already joined the game on-chain. Please continue playing.");
+        }
+      }
+    }
     await sendMessage(player, 'ready');
   }
 
@@ -156,8 +202,6 @@ function PlayerBoard(props: {
       const battleshipWaku = await getContract(process.env.NEXT_PUBLIC_BATTLESHIP_CONTRACT_ADDRESS as string, battleshipWakuAbi.abi);
       const userAddress = address;
 
-
-      
       if(joinedOrCreated === "created") {
         let _gameId = gameId;
         if(!_gameId) {

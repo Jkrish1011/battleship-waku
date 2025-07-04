@@ -56,7 +56,7 @@ const Container = (props: {
         console.log(`ships_${roomId}`);
         const _ships = localStorage.getItem(`ships_${roomId}`) || null;
         console.log(_ships);
-        if(_ships !== '' || _ships !== undefined || _ships !== null) {
+        if(_ships !== '' && _ships !== undefined && _ships !== null) {
             setLocalShips(JSON.parse(_ships));
         }
     }, []);

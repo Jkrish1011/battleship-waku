@@ -12,7 +12,9 @@ const OpponentBoard = (props: {
     roomId: string
 }) => {
     const {node, encoder, player, latestMessage, roomId} = props;
-
+    const [board, setBoard] = useState(createBoard());
+    const [move, setMove] = useState<string>('');
+    
     const handleHit = (hit: string) => {
       const newBoard = [...board];
       const rowIndex = parseInt(move.split(',')[0]);
@@ -43,8 +45,7 @@ const OpponentBoard = (props: {
       }
     }, [latestMessage]);
 
-    const [board, setBoard] = useState(createBoard());
-    const [move, setMove] = useState<string>('');
+    
     
     const { push } = useLightPush({node, encoder});
 
