@@ -155,6 +155,8 @@ function PlayerBoard(props: {
       await gameGenerator.initialize();
       const battleshipWaku = await getContract(process.env.NEXT_PUBLIC_BATTLESHIP_CONTRACT_ADDRESS as string, battleshipWakuAbi.abi);
       const userAddress = address;
+
+
       
       if(joinedOrCreated === "created") {
         let _gameId = gameId;
@@ -172,9 +174,12 @@ function PlayerBoard(props: {
           gasLimit: 5000000
         });
       }
+      toast.promise(tx.wait(), {
+        pending: "Transaction sent. Please wait for it to be confirmed.",
+        success: "Transaction confirmed.",
+        error: "Transaction failed."
+      });
       setTxDetails({ hash: tx.hash, status: 'pending' });
-      await tx.wait();
-      setTxDetails({ hash: tx.hash, status: 'confirmed' });
     }catch(error: any){
       setTxError(error?.message || 'Proof generation or transaction error');
       setTxDetails(null);

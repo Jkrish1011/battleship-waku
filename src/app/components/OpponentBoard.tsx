@@ -9,8 +9,9 @@ const OpponentBoard = (props: {
     node: any,
     encoder: any,
     latestMessage?: Message,
+    roomId: string
 }) => {
-    const {node, encoder, player, latestMessage} = props;
+    const {node, encoder, player, latestMessage, roomId} = props;
 
     const handleHit = (hit: string) => {
       const newBoard = [...board];
@@ -18,6 +19,7 @@ const OpponentBoard = (props: {
       const colIndex = parseInt(move.split(',')[1]);
       newBoard[rowIndex][colIndex] = hit;
       setBoard(newBoard);
+      localStorage.setItem(`board_${roomId}`, JSON.stringify(newBoard));
     }
 
     const handlelatestMessage = async (latestMessage: Message) => {
@@ -48,7 +50,7 @@ const OpponentBoard = (props: {
 
     const sendMoveMessage = async (rowIndex: any, colIndex: any) => {
       console.log("sending move message");
-      setMove(`${rowIndex},${colIndex}`)
+      setMove(`${rowIndex},${colIndex}`);
       // 1/ create message
       const newMessage = MoveMessage.create({
         timestamp: Date.now(),
@@ -72,6 +74,13 @@ const OpponentBoard = (props: {
         }
       }
     }
+
+    useEffect(() => {
+      const _board = localStorage.getItem(`board_${roomId}`);
+      if(_board !== null && _board !== undefined && _board !== '') {
+        setBoard(JSON.parse(_board));
+      }
+    }, [roomId]);
 
     return (
       <div className="grid grid-cols-2 gap-4">

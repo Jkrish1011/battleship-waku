@@ -93,7 +93,7 @@ const Container = (props: {
                         <h1 className="text-lg font-bold text-center">
                             Opponent Board
                         </h1>
-                        <OpponentBoard player={player} encoder={encoder} node={node} latestMessage={latestMessage} />
+                        <OpponentBoard player={player} encoder={encoder} node={node} latestMessage={latestMessage} roomId={roomId} />
                     </div>
                 }
             </div>
