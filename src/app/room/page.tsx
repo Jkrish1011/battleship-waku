@@ -18,7 +18,6 @@ declare global {
   }
 }
 
-
 function generateThreeDigitNumber(): number {
     // Generate a number between 0 (inclusive) and 1 (exclusive),
     // multiply it by 900 to get a range of 0 to 899,
@@ -30,14 +29,10 @@ function generateThreeDigitNumber(): number {
 const Page = () => {
     const [username, setUsername] = useState<string>('');
     const [games, setGames] = useState<any[]>([]);
-    const [room, setRoom] = useState<string>('');
     const router = useRouter();
-    const {address} = useWallet() as {address: string | null};
 
     useEffect(() => {
       (async () => {
-        console.log(process.env.NEXT_PUBLIC_BATTLESHIP_CONTRACT_ADDRESS);
-        console.log(battleshipWakuAbi.abi);
         const contract = await getContract(process.env.NEXT_PUBLIC_BATTLESHIP_CONTRACT_ADDRESS as string, battleshipWakuAbi.abi);
         const games = await contract.getAllGames({
           gasLimit: 500000
@@ -92,10 +87,7 @@ const Page = () => {
             </button>
           </div>
 
-         
           <div>
-           
-      
             {games.length > 0 && (
               <>
                 <div className="text-center text-gray-500 my-2">
@@ -156,11 +148,11 @@ const Page = () => {
                     })}
                   </div>
                 </div>
-            </>
+              </>
             )}
           </div>
         </div>
-        </>
+      </>
     )
 };
 

@@ -22,9 +22,10 @@ function PlayerBoard(props: {
   roomId: string,
   joinedOrCreated: string,
   gameId?: string,
-  opponentProofs?: Message | null
+  opponentProofs?: Message | null,
+  localShips?: Ship[]
 }) {
-  const {node, encoder, isLoading, player, latestMessage, roomId, joinedOrCreated, gameId, opponentProofs} = props;
+  const {node, encoder, isLoading, player, latestMessage, roomId, joinedOrCreated, gameId, opponentProofs, localShips} = props;
   const [wasmBuffer, setWasmBuffer] = useState<Uint8Array|null>(null);
   const [isReadyToPlay, setIsReadyToPlay] = useState(false);
   const [zkeyBuffer, setZkeyBuffer] = useState<Uint8Array|null>(null);
@@ -40,6 +41,7 @@ function PlayerBoard(props: {
   const [proofPlayer, setProofPlayer] = useState<any>(null);
   const [calldataPlayer, setCalldataPlayer] = useState<any>(null);
   const [verificationJson, setVerificationJson] = useState<string|null>(null);
+  const [shipsLocal, setShipsLocal] = useState<Ship[]>(localShips || []);
   
   const doesShipExistOn = (rowIndex: number, colIndex: number, board: number[][]) => {
     return Boolean(board[rowIndex][colIndex])
@@ -93,6 +95,16 @@ function PlayerBoard(props: {
     .catch(err => {
       console.error("failed to load wasm or zkey:", err);
     });
+  }, []);
+
+  // Replace the ships if found in the localStorage
+  useEffect(() => {
+    if(shipsLocal != null) {
+      for(let i=0; i < shipsLocal.length; i++) {
+        const currShip = shipsLocal[i];
+        placeShipOnBoardWithShip(currShip.x, currShip.y, currShip);
+      }
+    }
   }, []);
 
   useEffect(() => {
@@ -151,9 +163,9 @@ function PlayerBoard(props: {
         } else {
           _gameId = gameId;
         }
-      tx = await battleshipWaku.createGame(userAddress, calldataPlayer, _gameId, roomId, {
-        gasLimit: 5000000
-      });
+        tx = await battleshipWaku.createGame(userAddress, calldataPlayer, _gameId, roomId, {
+          gasLimit: 5000000
+        });
       } else {
         console.log("joining game");
         tx = await battleshipWaku.JoinGame(userAddress, calldataPlayer, gameId, {
@@ -184,6 +196,10 @@ function PlayerBoard(props: {
       const {proof: _proofPlayer, calldata: _calldataPlayer} = await gameGenerator.generateProof(correctInput, wasmBuffer as Uint8Array, zkeyBuffer as Uint8Array);
       setProofPlayer(_proofPlayer);
       setCalldataPlayer(_calldataPlayer);
+      // console.log({ships});
+
+      // localStorage.setItem(`ships_${roomId}`, JSON.stringify(ships.map(item => ({...item, placed: false}))));
+      localStorage.setItem(`ships_${roomId}`, JSON.stringify(ships));
     } catch (error: any) {
       setTxError(error?.message || 'Proof generation or transaction error');
       console.error('Proof generation error:', error);
@@ -213,6 +229,8 @@ function PlayerBoard(props: {
     setSelectedShip(null);
     setBoard(createBoard());
     setShipPlacement([]);
+    setShipsLocal([]);
+    setIsReadyToPlay(false);
   };
 
   const handleShipSelection = (ship: Ship) => {
@@ -243,6 +261,53 @@ function PlayerBoard(props: {
         ship.id === shipId ? { ...ship, placed: false } : ship
       )
     );
+  };
+
+  // New function to place ship with ship parameter
+  const placeShipOnBoardWithShip = (rowIndex: number, colIndex: number, currShip: Ship) => {
+    setSelectedShip(currShip);
+    const newBoard = [...board];
+    let canPlace = true;
+
+    // Check if the ship can be placed
+    for (let i = 0; i < currShip.size; i++) {
+      if (currShip.orientation === "horizontal") {
+        if (
+          colIndex + i >= BOARD_SIZE ||
+          newBoard[rowIndex][colIndex + i] !== 0
+        ) {
+          canPlace = false;
+          break;
+        }
+      } else {
+        if (
+          rowIndex + i >= BOARD_SIZE ||
+          newBoard[rowIndex + i][colIndex] !== 0
+        ) {
+          canPlace = false;
+          break;
+        }
+      }
+    }
+
+    if (canPlace) {
+      for (let i = 0; i < currShip.size; i++) {
+        if (currShip.orientation === "horizontal") {
+          newBoard[rowIndex][colIndex + i] = 1; // Mark ship cells with 1
+        } else {
+          newBoard[rowIndex + i][colIndex] = 1;
+        }
+      }
+      setBoard(newBoard);
+
+      // Mark the ship as placed
+      const newShips = shipsLocal.map((ship) =>
+        ship.id === currShip.id ? { ...ship, placed: true, x: rowIndex, y: colIndex } : ship
+      );
+      setShipPlacement(prev => [...prev, [rowIndex, colIndex, currShip.size, currShip.orientation === "horizontal" ? 1 : 0]]);
+      setShips(newShips);
+      setSelectedShip(null); // Clear selection
+    }
   };
 
   const placeShipOnBoard = (rowIndex: number, colIndex: number) => {
@@ -284,7 +349,7 @@ function PlayerBoard(props: {
 
       // Mark the ship as placed
       const newShips = ships.map((ship) =>
-        ship.id === selectedShip.id ? { ...ship, placed: true } : ship
+        ship.id === selectedShip.id ? { ...ship, placed: true, x: rowIndex, y: colIndex } : ship
       );
       setShipPlacement(prev => [...prev, [rowIndex, colIndex, selectedShip.size, selectedShip.orientation === "horizontal" ? 1 : 0]]);
       setShips(newShips);
@@ -332,29 +397,29 @@ function PlayerBoard(props: {
       3/ Use push functionality to send the message
     */
 
-      // 1/ create message
-      const newMessage = MoveReplyMessage.create({
-        timestamp: Date.now(),
-        hit:hit,
-        sender: player,
-        id: crypto.randomUUID()
+    // 1/ create message
+    const newMessage = MoveReplyMessage.create({
+      timestamp: Date.now(),
+      hit:hit,
+      sender: player,
+      id: crypto.randomUUID()
+    });
+
+    // 2/ Serialize message
+    const serializedMessage = MoveReplyMessage.encode(newMessage).finish();
+
+    // 3/ Push Message
+    if (push) {
+      const pushRes = await push({
+        timestamp: new Date(),
+        payload: serializedMessage
       });
+      // console.log({pushRes});
 
-      // 2/ Serialize message
-      const serializedMessage = MoveReplyMessage.encode(newMessage).finish();
-
-      // 3/ Push Message
-      if (push) {
-        const pushRes = await push({
-          timestamp: new Date(),
-          payload: serializedMessage
-        });
-        // console.log({pushRes});
-
-        if (!pushRes) {
-          alert('unable to connect to a stable node. please reload the page!');
-        }
+      if (!pushRes) {
+        alert('unable to connect to a stable node. please reload the page!');
       }
+    }
   }
 
   return (
@@ -368,7 +433,7 @@ function PlayerBoard(props: {
       )}
       <div className={`grid grid-cols-2 gap-4 ${isLoadingProof ? 'pointer-events-none opacity-50' : ''}`}> 
         <div className="flex flex-col items-center space-y-2 mt-4">
-          {ships
+          {shipsLocal.length === 0 && ships
             .filter((ship) => !ship.placed)
             .map((ship) => (
               <button 

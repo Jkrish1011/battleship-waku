@@ -93,7 +93,7 @@ export class BattleshipGameGenerator {
     
         let boardState = Array(100).fill(0);
     
-        console.log("Generating board state from ship placements...\n");
+        // console.log("Generating board state from ship placements...\n");
     
         ships.forEach((ship, shipIndex) => {
             const [x, y, length, orientation] = ship;
@@ -117,14 +117,14 @@ export class BattleshipGameGenerator {
         // }
         // console.log("];");
     
-        console.log("\nBoard visualization:");
+        // console.log("\nBoard visualization:");
         for (let row = 0; row < 10; row++) {
             let rowStr = `${row}: `;
             for (let col = 0; col < 10; col++) {
                 const index = row * 10 + col;
                 rowStr += boardState[index] === 1 ? '■' : '·';
             }
-            console.log(rowStr);
+            // console.log(rowStr);
         }
     
         // const totalShips = boardState.reduce((sum, cell) => sum + cell, 0);
@@ -136,7 +136,7 @@ export class BattleshipGameGenerator {
         if (currentSalt === null) {
             currentSalt = this.generateSalt();
         }
-        console.log("Salt: ", currentSalt.toString());
+        // console.log("Salt: ", currentSalt.toString());
     
         const merkleRoot = await this.calculateMerkleRoot(boardState);
         const commitment = await this.calculateCommitment(merkleRoot, currentSalt);
@@ -196,7 +196,7 @@ export class BattleshipGameGenerator {
     }
     
     validateInput(ships, boardState) {
-        console.log("Validating input...");
+        // console.log("Validating input...");
     
         let expectedBoard = Array(100).fill(0);
     
@@ -260,11 +260,9 @@ export class BattleshipGameGenerator {
         if (issues.length > 0) {
             console.log("\nValidation issues:");
             issues.forEach((issue) => console.log(`- ${issue}`));
-            console.log("returning false");
             return false;
         } else {
             console.log("\nValidation successful!");
-            console.log("returning true");
             return true;
         }
     }
@@ -287,7 +285,6 @@ export class BattleshipGameGenerator {
     
     async generateProof(input, wasmContent, zkeyContent) {
         const proof = await snarkjs.groth16.fullProve(input, wasmContent, zkeyContent);
-        console.log("proof", proof);
         const calldataStr = await snarkjs.groth16.exportSolidityCallData(proof.proof, proof.publicSignals);
         const calldata = JSON.parse("[" + calldataStr + "]");
         return {calldata, proof};

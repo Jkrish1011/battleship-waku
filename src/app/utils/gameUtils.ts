@@ -27,6 +27,8 @@ export type Ship = {
   size: number;
   orientation: string;
   placed: boolean;
+  x: number;
+  y: number;
 };
 
 export type ShipPlacement = {
@@ -42,11 +44,11 @@ const createBoard = () =>
   Array.from({ length: BOARD_SIZE }, () => Array(BOARD_SIZE).fill(0)); // Fill with 0 for empty cells
 
 const SHIPS: Ship[] = [
-  { id: 1, size: 3, orientation: "horizontal", placed: false },
-  { id: 2, size: 3, orientation: "horizontal", placed: false },
-  { id: 3, size: 2, orientation: "horizontal", placed: false },
-  { id: 4, size: 2, orientation: "vertical", placed: false },
-  { id: 5, size: 2, orientation: "vertical", placed: false },
+  { id: 1, size: 3, orientation: "horizontal", placed: false, x: 0, y: 0 },
+  { id: 2, size: 3, orientation: "horizontal", placed: false, x: 0, y: 0 },
+  { id: 3, size: 2, orientation: "horizontal", placed: false, x: 0, y: 0 },
+  { id: 4, size: 2, orientation: "vertical", placed: false, x: 0, y: 0 },
+  { id: 5, size: 2, orientation: "vertical", placed: false, x: 0, y: 0 },
 ];
 
 // Creating the chat message in a way the waku protocol can understand.

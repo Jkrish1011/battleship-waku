@@ -8,7 +8,8 @@ import PlayerBoard from "./PlayerBoard";
 import { Player, Message } from "../types";
 import OpponentBoard from "./OpponentBoard";
 import { useContentPair, useFilterMessages, useWaku } from "@waku/react";
-import { decodeMessage, isGameReady } from "../utils/gameUtils";
+import { Ship } from "../utils/gameUtils";
+import { decodeMessage, isGameReady , Ship} from "../utils/gameUtils";
 import Spinner from "./Spinner";
 import { findLatestMessage } from "../utils";
 
@@ -23,6 +24,7 @@ const Container = (props: {
     const [messages, setMessages] = useState<Message[]>();
     const [latestMessage, setLatestMessage] = useState<Message>();
     const [opponentProofs, setOpponentProofs] = useState<Message>();
+    const [localShips, setLocalShips] = useState<Ship[]>();
     // This provides the node which we will use for the communication.
     const { node, isLoading, error} = useWaku();
 
@@ -50,6 +52,15 @@ const Container = (props: {
         }
     }, [filterMessages]);
 
+    useEffect(() => {
+        console.log(`ships_${roomId}`);
+        const _ships = localStorage.getItem(`ships_${roomId}`) || null;
+        console.log(_ships);
+        if(_ships !== '' || _ships !== undefined || _ships !== null) {
+            setLocalShips(JSON.parse(_ships));
+        }
+    }, []);
+
     if (isLoading) {
         return <Spinner />
     }
@@ -71,6 +82,7 @@ const Container = (props: {
                     joinedOrCreated={joinedOrCreated}
                     gameId={gameId}
                     opponentProofs={opponentProofs}
+                    localShips={localShips}
                 />
 
                 {
