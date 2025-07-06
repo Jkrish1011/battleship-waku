@@ -169,6 +169,7 @@ export {
   ChatMessage,
   MoveMessage,
   MoveReplyMessage,
+  BoardProofMessage,
   decodeMessage,
   getContract,
   shorten,

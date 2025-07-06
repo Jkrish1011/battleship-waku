@@ -1,3 +1,4 @@
+// @ts-nocheck
 'use client'
 
 import { useParams, useSearchParams } from "next/navigation";
@@ -12,6 +13,7 @@ const Page = () => {
     const queryParams = useSearchParams();
     const username = queryParams.get('username');
     const roomId = searchParams.id as string;
+    const gameId = queryParams.get('gameId');
 
     return (
         // contentTopic is the way waku distinguish the particular message from all the other messages being passed through the network.
@@ -28,7 +30,7 @@ const Page = () => {
                 Share this room ID with your friend to start playing now
             </div>
 
-            <Container player={Player.p1} roomId={roomId} joinedOrCreated="created" />
+            <Container player={Player.p1} roomId={roomId} joinedOrCreated="created" gameId={gameId} />
             </div>
         </ContentPairProvider>
     )

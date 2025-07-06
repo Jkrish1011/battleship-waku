@@ -3,7 +3,7 @@ import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Player, Message } from "../types";
 
-import { BOARD_SIZE, createBoard, Ship, SHIPS, ChatMessage, MoveReplyMessage } from "../utils/gameUtils";
+import { BOARD_SIZE, createBoard, Ship, SHIPS, ChatMessage, MoveReplyMessage, BoardProofMessage } from "../utils/gameUtils";
 import { useLightPush } from "@waku/react";
 import { BattleshipGameGenerator } from "./helpers/gameGenerator";
 import { getContract } from "../utils/gameUtils";
@@ -45,7 +45,7 @@ function PlayerBoard(props: {
   const [games, setGames] = useState<any[]>([]);
   
   const doesShipExistOn = (rowIndex: number, colIndex: number, board: number[][]) => {
-    return Boolean(board[rowIndex][colIndex])
+    return Boolean(board[rowIndex][colIndex]);
   }
 
   const handleLatestMessage = async (_message: Message) => {
@@ -179,11 +179,15 @@ function PlayerBoard(props: {
         const game = games[i];
         if(game.gameId === gameId && game.isActive === false) {
           await joinGame();
-        } else {
-          toast.success("You had already joined the game on-chain. Please continue playing.");
-        }
+        } 
       }
+      toast.success("You had already joined the game on-chain. Please continue playing.");
     }
+    console.log('sending calldataplayer message');
+    await sendBoardProofMessage(JSON.stringify(calldataPlayer));
+    console.log('sending proofPlayer message');
+    await sendBoardProofMessage(JSON.stringify(proofPlayer));
+    console.log('Ready Message');
     await sendMessage(player, 'ready');
   }
 
@@ -437,6 +441,40 @@ function PlayerBoard(props: {
           alert('unable to connect to a stable node. please reload the page!');
         }
       }
+  }
+
+  // This is the function which will sent the proofs between the players in real time.
+  const sendBoardProofMessage = async (proof: string) => {
+    /*
+      1/ Create a message
+      2/ Serialize the message
+      3/ Use push functionality to send the message
+    */
+   console.log("sendBoardProofMessage");
+    console.log({proof});
+    // 1/ create message
+    const newMessage = BoardProofMessage.create({
+      timestamp: Date.now(),
+      proof:proof,
+      sender: player,
+      id: crypto.randomUUID()
+    });
+
+    // 2/ Serialize message
+    const serializedMessage = BoardProofMessage.encode(newMessage).finish();
+
+    // 3/ Push Message
+    if (push) {
+      const pushRes = await push({
+        timestamp: new Date(),
+        payload: serializedMessage
+      });
+      // console.log({pushRes});
+
+      if (!pushRes) {
+        alert('unable to connect to a stable node. please reload the page!');
+      }
+    }
   }
 
   const sendMoveReplyMessage = async (hit: string) => {

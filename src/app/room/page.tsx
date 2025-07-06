@@ -143,7 +143,7 @@ const Page = () => {
                                 disabled={!Boolean(username)}
                                 onClick={() => {
                                   if(game.player1.toLowerCase() === address.toLowerCase()) {
-                                    router.push(`/room/${game.wakuRoomId.toString()}?username=${username}`)
+                                    router.push(`/room/${game.wakuRoomId.toString()}?username=${username}&gameId=${game.gameId.toString()}`)
                                   } else {
                                     router.push(`/join/${game.wakuRoomId.toString()}?username=${username}&gameId=${game.gameId.toString()}`)
                                   }

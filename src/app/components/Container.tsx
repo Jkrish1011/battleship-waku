@@ -39,11 +39,11 @@ const Container = (props: {
         // 1. Define a decodeMessage function
         // 2. Map over filterMessages using decodeMessage function
         const decodedMessages = filterMessages.map((item) => decodeMessage(item, ''));
-        // console.log(decodedMessages);
+        console.log(decodedMessages);
         if(decodedMessages) {
             setMessages(decodedMessages as Message[]);
             const _latestMessage = findLatestMessage(decodedMessages as Message[]);
-
+            console.log({_latestMessage});
             if(_latestMessage?.proof) {
                 setOpponentProofs(_latestMessage);
             } else if(_latestMessage?.message || _latestMessage?.move || _latestMessage?.hit) {
