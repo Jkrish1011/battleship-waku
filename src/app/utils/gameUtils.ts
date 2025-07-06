@@ -73,7 +73,13 @@ const MoveReplyMessage = new protobuf.Type("MoveReplyMessage")
 const BoardProofMessage = new protobuf.Type("BoardProofMessage")
   .add(new protobuf.Field("timestamp", 1, "uint64"))
   .add(new protobuf.Field("sender", 2, "string"))
-  .add(new protobuf.Field("proof", 3, "string"))
+  .add(new protobuf.Field("proof", 7, "string"))
+  .add(new protobuf.Field("id", 4, "string"));
+
+const BoardProofCalldataMessage = new protobuf.Type("BoardProofCalldataMessage")
+  .add(new protobuf.Field("timestamp", 1, "uint64"))
+  .add(new protobuf.Field("sender", 2, "string"))
+  .add(new protobuf.Field("calldata", 8, "string"))
   .add(new protobuf.Field("id", 4, "string"));
 
 const decodeMessage = (wakuMessage: any, type: string) => {
@@ -82,36 +88,38 @@ const decodeMessage = (wakuMessage: any, type: string) => {
     return {};
   }
   try {
-    
-    var { timestamp, sender, message, id } = ChatMessage.decode(
+    const { timestamp, sender, message, id } = ChatMessage.decode(
       wakuMessage.payload
     );
     if (message) {
       return { timestamp, sender, message, id };
-    } 
-    
-    var { timestamp, sender, move, id } = MoveMessage.decode(
+    } else {
+      const { timestamp, sender, move, id } = MoveMessage.decode(
         wakuMessage.payload
       );
-    if (move) {
-      return { timestamp, sender, move, id };
-    } 
-    
-    var { timestamp, sender, hit, id } = MoveReplyMessage.decode(
-      wakuMessage.payload
-    );
-    if (hit) {
-      return { timestamp, sender, hit, id };
+      if (move) {
+        return { timestamp, sender, move, id };
+      } else {
+        const { timestamp, sender, hit, id } = MoveReplyMessage.decode(
+          wakuMessage.payload
+        );
+        if(hit) {
+          return { timestamp, sender, hit, id };
+        } else{
+          var { timestamp, sender, proof, id } = BoardProofMessage.decode(
+            wakuMessage.payload
+          );
+          if(proof) {
+            return { timestamp, sender, proof, id };
+          } else {
+            var { timestamp, sender, calldata, id } = BoardProofCalldataMessage.decode(
+              wakuMessage.payload
+            );
+            return { timestamp, sender, calldata, id };
+          }
+        }
+      }
     }
-    
-    var { timestamp, sender, proof, id } = BoardProofMessage.decode(
-      wakuMessage.payload
-    );
-    if (proof) {
-      return { timestamp, sender, proof, id };
-    }
-      
-  
   } catch (err) {
     console.error(err);
   }
@@ -170,6 +178,7 @@ export {
   MoveMessage,
   MoveReplyMessage,
   BoardProofMessage,
+  BoardProofCalldataMessage,
   decodeMessage,
   getContract,
   shorten,

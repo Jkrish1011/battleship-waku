@@ -11,4 +11,5 @@ export type Message = {
   move?: string;
   hit?: string;
   proof?: string;
+  calldata?: string;
 };

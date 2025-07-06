@@ -45,8 +45,6 @@ const OpponentBoard = (props: {
       }
     }, [latestMessage]);
 
-    
-    
     const { push } = useLightPush({node, encoder});
 
     const sendMoveMessage = async (rowIndex: any, colIndex: any) => {

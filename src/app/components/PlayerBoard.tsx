@@ -1,9 +1,10 @@
+// @ts-nocheck
 "use client"
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Player, Message } from "../types";
 
-import { BOARD_SIZE, createBoard, Ship, SHIPS, ChatMessage, MoveReplyMessage, BoardProofMessage } from "../utils/gameUtils";
+import { BOARD_SIZE, createBoard, Ship, SHIPS, ChatMessage, MoveReplyMessage, BoardProofMessage, BoardProofCalldataMessage } from "../utils/gameUtils";
 import { useLightPush } from "@waku/react";
 import { BattleshipGameGenerator } from "./helpers/gameGenerator";
 import { getContract } from "../utils/gameUtils";
@@ -23,9 +24,10 @@ function PlayerBoard(props: {
   joinedOrCreated: string,
   gameId?: string,
   opponentProofs?: Message | null,
+  opponentCalldataProofs?: Message | null,
   localShips?: Ship[]
 }) {
-  const {node, encoder, isLoading, player, latestMessage, roomId, joinedOrCreated, gameId, opponentProofs, localShips} = props;
+  const {node, encoder, isLoading, player, latestMessage, roomId, joinedOrCreated, gameId, opponentProofs, localShips, opponentCalldataProofs} = props;
   const [wasmBuffer, setWasmBuffer] = useState<Uint8Array|null>(null);
   const [isReadyToPlay, setIsReadyToPlay] = useState(false);
   const [zkeyBuffer, setZkeyBuffer] = useState<Uint8Array|null>(null);
@@ -39,6 +41,8 @@ function PlayerBoard(props: {
   const [txDetails, setTxDetails] = useState<any>(null);
   const [txError, setTxError] = useState<string|null>(null);
   const [proofPlayer, setProofPlayer] = useState<any>(null);
+  const [calldataProofOpponentPlayer, setCalldataProofOpponentPlayer] = useState<any>(opponentCalldataProofs || null);
+  const [proofOpponentPlayer, setProofOpponentPlayer] = useState<any>(opponentProofs || null);
   const [calldataPlayer, setCalldataPlayer] = useState<any>(null);
   const [verificationJson, setVerificationJson] = useState<string|null>(null);
   const [shipsLocal, setShipsLocal] = useState<Ship[]>(localShips || []);
@@ -116,6 +120,20 @@ function PlayerBoard(props: {
   }, [localShips]);
 
   useEffect(() => {
+    if (opponentProofs) {
+      setProofOpponentPlayer(opponentProofs);
+    }
+  }, [opponentProofs]);
+
+  useEffect(() => {
+    if (opponentCalldataProofs) {
+      console.log('opponentCalldataProofs');
+      console.log(opponentCalldataProofs);
+      setCalldataProofOpponentPlayer(opponentCalldataProofs);
+    }
+  }, [opponentCalldataProofs]);
+
+  useEffect(() => {
     const _games = localStorage.getItem('games');
     if(_games !== null && _games !== undefined && _games !== '') {
       let parsedGames: any[] = [];
@@ -165,6 +183,20 @@ function PlayerBoard(props: {
     return isValid;
   }
 
+  const verifyOpponentProofs = async () => {
+    console.log("verifying opponent proofs")
+    const gameGenerator = new BattleshipGameGenerator();
+    await gameGenerator.initialize();
+    const isValid = await gameGenerator.verifyProof(verificationJson, proofOpponentPlayer);
+    console.log("isValid", isValid);
+    if(isValid) {
+      toast.success("Proof verified");
+    } else {
+      toast.error("Proof verification failed");
+    }
+    return isValid;
+  }
+
   const sendReadyToPlay = async () => {
     if(!areAllShipsPlaced()) {
       alert('Please place all ships before sending ready to play message');
@@ -184,7 +216,7 @@ function PlayerBoard(props: {
       toast.success("You had already joined the game on-chain. Please continue playing.");
     }
     console.log('sending calldataplayer message');
-    await sendBoardProofMessage(JSON.stringify(calldataPlayer));
+    await sendBoardCalldataMessage(JSON.stringify(calldataPlayer));
     console.log('sending proofPlayer message');
     await sendBoardProofMessage(JSON.stringify(proofPlayer));
     console.log('Ready Message');
@@ -445,18 +477,13 @@ function PlayerBoard(props: {
 
   // This is the function which will sent the proofs between the players in real time.
   const sendBoardProofMessage = async (proof: string) => {
-    /*
-      1/ Create a message
-      2/ Serialize the message
-      3/ Use push functionality to send the message
-    */
-   console.log("sendBoardProofMessage");
-    console.log({proof});
+  
+    console.log("sending proof message");
     // 1/ create message
     const newMessage = BoardProofMessage.create({
       timestamp: Date.now(),
-      proof:proof,
       sender: player,
+      proof: proof,
       id: crypto.randomUUID()
     });
 
@@ -469,9 +496,35 @@ function PlayerBoard(props: {
         timestamp: new Date(),
         payload: serializedMessage
       });
-      // console.log({pushRes});
+      
+      if (pushRes?.errors?.length && pushRes?.errors?.length) {
+        alert('unable to connect to a stable node. please reload the page!');
+      }
+    }
+  }
 
-      if (!pushRes) {
+  const sendBoardCalldataMessage = async (proof: string) => {
+  
+    console.log("sending calldata message");
+    // 1/ create message
+    const newMessage = BoardProofCalldataMessage.create({
+      timestamp: Date.now(),
+      sender: player,
+      calldata: proof,
+      id: crypto.randomUUID()
+    });
+
+    // 2/ Serialize message
+    const serializedMessage = BoardProofCalldataMessage.encode(newMessage).finish();
+
+    // 3/ Push Message
+    if (push) {
+      const pushRes = await push({
+        timestamp: new Date(),
+        payload: serializedMessage
+      });
+      
+      if (pushRes?.errors?.length && pushRes?.errors?.length) {
         alert('unable to connect to a stable node. please reload the page!');
       }
     }
@@ -604,21 +657,27 @@ function PlayerBoard(props: {
         </div>
       </div>
       )}
-      {opponentProofs && (
+      {calldataProofOpponentPlayer && (
       <div id="proof-container" className="mt-8 p-4 bg-gray-50 rounded-lg border border-gray-200">
         <div className="space-y-4">
           <h3 className="font-bold mb-2">Opponent Board Proof</h3>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Proof</label>
             <textarea id="proof" className="w-full h-40 p-3 bg-gray-100 rounded font-mono text-sm resize-y" readOnly>
-              {
+            {
                 (() => {
-                  return JSON.stringify(opponentProofs, null, 2);
+                  const _p = {
+                    pA: calldataProofOpponentPlayer[0].toString(),
+                    pB: calldataProofOpponentPlayer[1].toString(),
+                    pC: calldataProofOpponentPlayer[2].toString(),
+                    publicInput: calldataProofOpponentPlayer[3].toString(),
+                  };
+                  return JSON.stringify(_p, null, 2);
                 })()
               }
             </textarea>
           </div>
-          <button id="verifyProofs" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded transition-colors">
+          <button id="verifyProofs" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded transition-colors" onClick={verifyOpponentProofs}>
             Verify Proof In-Browser
           </button>
         </div>
