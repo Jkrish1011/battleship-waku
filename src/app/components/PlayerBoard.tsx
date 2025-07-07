@@ -29,8 +29,10 @@ function PlayerBoard(props: {
 }) {
   const {node, encoder, isLoading, player, latestMessage, roomId, joinedOrCreated, gameId, opponentProofs, localShips, opponentCalldataProofs} = props;
   const [wasmBuffer, setWasmBuffer] = useState<Uint8Array|null>(null);
+  const [moveWasmBuffer, setMoveWasmBuffer] = useState<Uint8Array|null>(null);
   const [isReadyToPlay, setIsReadyToPlay] = useState(false);
   const [zkeyBuffer, setZkeyBuffer] = useState<Uint8Array|null>(null);
+  const [moveZkeyBuffer, setMoveZkeyBuffer] = useState<Uint8Array|null>(null);
   const {address} = useWallet() as {address: string | null};
   const [board, setBoard] = useState(createBoard());
   const [selectedShip, setSelectedShip] = useState<Ship | null>(null);
@@ -45,6 +47,7 @@ function PlayerBoard(props: {
   const [proofOpponentPlayer, setProofOpponentPlayer] = useState<any>(opponentProofs || null);
   const [calldataPlayer, setCalldataPlayer] = useState<any>(null);
   const [verificationJson, setVerificationJson] = useState<string|null>(null);
+  const [moveVerificationJson, setMoveVerificationJson] = useState<string|null>(null);
   const [shipsLocal, setShipsLocal] = useState<Ship[]>(localShips || []);
   const [games, setGames] = useState<any[]>([]);
   
@@ -91,11 +94,17 @@ function PlayerBoard(props: {
       fetch("/shipPlacement/ship_placement.wasm").then(r => r.arrayBuffer()).then(buffer => new Uint8Array(buffer)),
       fetch("/shipPlacement/ship_placement_final.zkey").then(r => r.arrayBuffer()).then(buffer => new Uint8Array(buffer)),
       fetch("/shipPlacement/ship_verification_key.json").then(r => r.json()),
+      fetch("/moveVerification/move_verification.wasm").then(r => r.arrayBuffer()).then(buffer => new Uint8Array(buffer)),
+      fetch("/moveVerification/move_verification_final.zkey").then(r => r.arrayBuffer()).then(buffer => new Uint8Array(buffer)),
+      fetch("/moveVerification/move_verification_key.json").then(r => r.json()),
     ])
-    .then(([wasm, zkey, verificationJson]) => {
+    .then(([wasm, zkey, verificationJson, moveWasm, moveZKey, moveVerificationJson]) => {
       setWasmBuffer(wasm);
       setZkeyBuffer(zkey);
       setVerificationJson(verificationJson);
+      setMoveWasmBuffer(wasm);
+      setMoveZkeyBuffer(zkey);
+      setMoveVerificationJson(verificationJson);
     })
     .catch(err => {
       console.error("failed to load wasm or zkey:", err);
@@ -127,8 +136,6 @@ function PlayerBoard(props: {
 
   useEffect(() => {
     if (opponentCalldataProofs) {
-      console.log('opponentCalldataProofs');
-      console.log(opponentCalldataProofs);
       setCalldataProofOpponentPlayer(opponentCalldataProofs);
     }
   }, [opponentCalldataProofs]);
@@ -274,6 +281,32 @@ function PlayerBoard(props: {
     }
 
     setIsLoadingProof(true);
+    try {
+      const gameGenerator = new BattleshipGameGenerator();
+      await gameGenerator.initialize();
+      const correctInput = await gameGenerator.generateCorrectInput(shipPlacement);
+      const {proof: _proofPlayer, calldata: _calldataPlayer} = await gameGenerator.generateProof(correctInput, wasmBuffer as Uint8Array, zkeyBuffer as Uint8Array);
+      setProofPlayer(_proofPlayer);
+      setCalldataPlayer(_calldataPlayer);
+      // console.log({ships});
+
+      // localStorage.setItem(`ships_${roomId}`, JSON.stringify(ships.map(item => ({...item, placed: false}))));
+      localStorage.setItem(`ships_${roomId}`, JSON.stringify(ships));
+    } catch (error: any) {
+      setTxError(error?.message || 'Proof generation or transaction error');
+      console.error('Proof generation error:', error);
+    } finally {
+      setIsLoadingProof(false);
+      setIsReadyToPlay(true);
+    }
+  }
+
+  const generateMoveProof = async () => {
+    if(!areAllShipsPlaced()) {
+      alert('Please place all ships before generating board proof');
+      return;
+    }
+
     try {
       const gameGenerator = new BattleshipGameGenerator();
       await gameGenerator.initialize();
