@@ -234,20 +234,8 @@ function PlayerBoard(props: {
       return;
     }
     console.log({games});
-    let existingGameFound = false;
-    if(games.length > 0) {
-      for(let i=0; i < games.length; i++) {
-        const game = games[i];
-        if(game.gameId === gameId && game.isActive === false && game.player1 === address) {
-          existingGameFound = true;
-        } 
-      }
-      if(existingGameFound) {
-        toast.success("You had already joined the game on-chain. Please continue playing.");
-        return;
-      }
-    }
-    return ;
+    let existingGameFound_Player1 = false;
+    let existingGameFound_Player2 = false;
     let tx;
     setTxDetails(null);
     setTxError(null);
@@ -256,29 +244,48 @@ function PlayerBoard(props: {
       await gameGenerator.initialize();
       const battleshipWaku = await getContract(process.env.NEXT_PUBLIC_BATTLESHIP_CONTRACT_ADDRESS as string, battleshipWakuAbi.abi);
       const userAddress = address;
-
-      if(joinedOrCreated === "created") {
-        let _gameId = gameId;
-        if(!_gameId) {
-          _gameId = gameGenerator.randomBytesCrypto(32);
-        } else {
-          _gameId = gameId;
+      console.log({address});
+      console.log({joinedOrCreated});
+      if(games.length > 0) {
+        for(let i=0; i < games.length; i++) {
+          const game = games[i];
+          console.log({game});
+          if(game.gameId.toString() === gameId?.toString() && game.player1.toLowerCase() === address.toString().toLowerCase() && joinedOrCreated === "created") {
+            existingGameFound_Player1 = true;
+            toast.success("You had already joined the game on-chain. Please continue playing.");
+            return;
+          } else if (game.gameId.toString() === gameId?.toString() && game.player2.toLowerCase() === address.toString().toLowerCase() && game.isActive === "true" && joinedOrCreated === "joined") {
+            existingGameFound_Player2 = true;
+            toast.success("You had already joined the game on-chain. Please continue playing.");
+            return;
+          }
         }
-        tx = await battleshipWaku.createGame(userAddress, calldataPlayer, _gameId, roomId, {
-          gasLimit: 5000000
-        });
-      } else {
-        console.log("joining game");
-        tx = await battleshipWaku.JoinGame(userAddress, calldataPlayer, gameId, {
-          gasLimit: 5000000
-        });
+        console.log({existingGameFound_Player1});
+        console.log({existingGameFound_Player2});
+        if(joinedOrCreated === "created" && existingGameFound_Player1 === false) {
+          let _gameId = gameId;
+          if(!_gameId) {
+            _gameId = gameGenerator.randomBytesCrypto(32);
+          } else {
+            _gameId = gameId;
+          }
+          tx = await battleshipWaku.createGame(userAddress, calldataPlayer, _gameId, roomId, {
+            gasLimit: 5000000
+          });
+        } else if(joinedOrCreated === "joined" && existingGameFound_Player2 === false){
+          console.log("joining game");
+          tx = await battleshipWaku.JoinGame(userAddress, calldataPlayer, gameId, {
+            gasLimit: 5000000
+          });
+        } 
       }
+      
       toast.promise(tx.wait(), {
         pending: "Transaction sent. Please wait for it to be confirmed.",
         success: "Transaction confirmed.",
         error: "Transaction failed."
       });
-      setTxDetails({ hash: tx.hash, status: 'pending' });
+      setTxDetails({ hash: tx.hash, status: 'completed' });
     }catch(error: any){
       setTxError(error?.message || 'Proof generation or transaction error');
       setTxDetails(null);

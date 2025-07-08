@@ -46,9 +46,10 @@ const Container = (props: {
         if(decodedMessages) {
             setMessages(decodedMessages as Message[]);
             const _latestMessage = findLatestMessage(decodedMessages as Message[]);
-            console.log({_latestMessage});
+            console.log(_latestMessage?.sender);
+            console.log({player});
             // If the latest message is not from the sender itself, do not process. Only process from the opponent.
-            if(_latestMessage?.sender === address ) {
+            if(_latestMessage?.sender.toString().toLowerCase() !== player.toString().toLowerCase() ) {
                 if(_latestMessage?.proof) {
                     console.log("Setting opponent proofs!");
                     setOpponentProofs(JSON.parse(_latestMessage.proof));
