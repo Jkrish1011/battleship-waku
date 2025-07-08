@@ -12,6 +12,7 @@ import { Ship } from "../utils/gameUtils";
 import { decodeMessage, isGameReady , Ship} from "../utils/gameUtils";
 import Spinner from "./Spinner";
 import { findLatestMessage } from "../utils";
+import { useWallet } from "../store/useWallet";
 
 const Container = (props: {
     player: Player,
@@ -21,6 +22,7 @@ const Container = (props: {
 }) => {
 
     const {player, roomId, joinedOrCreated, gameId} = props;
+    const {address} = useWallet() as {address: string | null};
     const [messages, setMessages] = useState<Message[]>();
     const [latestMessage, setLatestMessage] = useState<Message>();
     const [opponentProofs, setOpponentProofs] = useState<Message>();
@@ -45,13 +47,16 @@ const Container = (props: {
             setMessages(decodedMessages as Message[]);
             const _latestMessage = findLatestMessage(decodedMessages as Message[]);
             console.log({_latestMessage});
-            if(_latestMessage?.proof) {
-                console.log("Setting opponent proofs!");
-                setOpponentProofs(JSON.parse(_latestMessage.proof));
-            } else if (_latestMessage?.calldata) {
-                setOpponentCalldataProofs(JSON.parse(_latestMessage.calldata));
-            } else if(_latestMessage?.message || _latestMessage?.move || _latestMessage?.hit) {
-                setLatestMessage(_latestMessage);
+            // If the latest message is not from the sender itself, do not process. Only process from the opponent.
+            if(_latestMessage?.sender === address ) {
+                if(_latestMessage?.proof) {
+                    console.log("Setting opponent proofs!");
+                    setOpponentProofs(JSON.parse(_latestMessage.proof));
+                } else if (_latestMessage?.calldata) {
+                    setOpponentCalldataProofs(JSON.parse(_latestMessage.calldata));
+                } else if(_latestMessage?.message || _latestMessage?.move || _latestMessage?.hit) {
+                    setLatestMessage(_latestMessage);
+                }
             }
         }
     }, [filterMessages]);

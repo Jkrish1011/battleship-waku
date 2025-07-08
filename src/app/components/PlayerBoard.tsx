@@ -28,6 +28,7 @@ function PlayerBoard(props: {
   localShips?: Ship[]
 }) {
   const {node, encoder, isLoading, player, latestMessage, roomId, joinedOrCreated, gameId, opponentProofs, localShips, opponentCalldataProofs} = props;
+  const CURRENT_BOARD_INPUT_STATE = `board_${roomId}_input_state`;
   const [wasmBuffer, setWasmBuffer] = useState<Uint8Array|null>(null);
   const [moveWasmBuffer, setMoveWasmBuffer] = useState<Uint8Array|null>(null);
   const [isReadyToPlay, setIsReadyToPlay] = useState(false);
@@ -76,10 +77,12 @@ function PlayerBoard(props: {
     }
 
     const hitOrMiss = hitOrMissFlag? "hit":"miss";
+    const hitOrMissNumeric = hitOrMissFlag? 1:0;
 
+    const proof = await generateMoveProof(hitOrMissNumeric, rowIndex, colIndex );
     // Create a new MoveReplyMessage
     // Send this message to the opponent board
-    await sendMoveReplyMessage(hitOrMiss);
+    await sendMoveReplyMessage(hitOrMiss, proof);
   }
   
   useEffect(() => {
@@ -213,16 +216,11 @@ function PlayerBoard(props: {
       alert('Please generate board proof before sending ready to play message');
       return;
     }
-    if(games.length > 0) {
-      for(let i=0; i < games.length; i++) {
-        const game = games[i];
-        if(game.gameId === gameId && game.isActive === false) {
-          await joinGame();
-        } 
-      }
-      toast.success("You had already joined the game on-chain. Please continue playing.");
-    }
+    
+    await joinGame();
+       
     console.log('sending calldataplayer message');
+    console.log({calldataPlayer});
     await sendBoardCalldataMessage(JSON.stringify(calldataPlayer));
     console.log('sending proofPlayer message');
     await sendBoardProofMessage(JSON.stringify(proofPlayer));
@@ -235,7 +233,21 @@ function PlayerBoard(props: {
       alert('Please place all ships before joining game');
       return;
     }
-
+    console.log({games});
+    let existingGameFound = false;
+    if(games.length > 0) {
+      for(let i=0; i < games.length; i++) {
+        const game = games[i];
+        if(game.gameId === gameId && game.isActive === false && game.player1 === address) {
+          existingGameFound = true;
+        } 
+      }
+      if(existingGameFound) {
+        toast.success("You had already joined the game on-chain. Please continue playing.");
+        return;
+      }
+    }
+    return ;
     let tx;
     setTxDetails(null);
     setTxError(null);
@@ -285,6 +297,7 @@ function PlayerBoard(props: {
       const gameGenerator = new BattleshipGameGenerator();
       await gameGenerator.initialize();
       const correctInput = await gameGenerator.generateCorrectInput(shipPlacement);
+      localStorage.setItem(CURRENT_BOARD_INPUT_STATE, correctInput);
       const {proof: _proofPlayer, calldata: _calldataPlayer} = await gameGenerator.generateProof(correctInput, wasmBuffer as Uint8Array, zkeyBuffer as Uint8Array);
       setProofPlayer(_proofPlayer);
       setCalldataPlayer(_calldataPlayer);
@@ -301,26 +314,33 @@ function PlayerBoard(props: {
     }
   }
 
-  const generateMoveProof = async () => {
+  const generateMoveProof = async (hit: number, x: number, y: number) => {
     if(!areAllShipsPlaced()) {
       alert('Please place all ships before generating board proof');
       return;
     }
+    setIsLoadingProof(true);
 
     try {
       const gameGenerator = new BattleshipGameGenerator();
+      const boardState = localStorage.getItem(CURRENT_BOARD_INPUT_STATE);
       await gameGenerator.initialize();
-      const correctInput = await gameGenerator.generateCorrectInput(shipPlacement);
-      const {proof: _proofPlayer, calldata: _calldataPlayer} = await gameGenerator.generateProof(correctInput, wasmBuffer as Uint8Array, zkeyBuffer as Uint8Array);
-      setProofPlayer(_proofPlayer);
-      setCalldataPlayer(_calldataPlayer);
-      // console.log({ships});
+      const moveInput = {
+        salt: boardState.salt,
+        commitment: boardState.commitment,
+        merkle_root: boardState.merkle_root,
+        board_state: boardState.board_state,
+        guess_x: x,
+        guess_y: y,
+        hit: hit
+      };
+      const {proof: _proofPlayer, calldata: _calldataPlayer} = await gameGenerator.generateProof(correctInput, moveWasmBuffer as Uint8Array, moveZkeyBuffer as Uint8Array);
+      
+      return {proof: _proofPlayer, calldata: _calldataPlayer};
 
-      // localStorage.setItem(`ships_${roomId}`, JSON.stringify(ships.map(item => ({...item, placed: false}))));
-      localStorage.setItem(`ships_${roomId}`, JSON.stringify(ships));
     } catch (error: any) {
-      setTxError(error?.message || 'Proof generation or transaction error');
-      console.error('Proof generation error:', error);
+      setTxError(error?.message || 'Move Proof generation or transaction error');
+      console.error('Move Proof generation error:', error);
     } finally {
       setIsLoadingProof(false);
       setIsReadyToPlay(true);
@@ -563,7 +583,7 @@ function PlayerBoard(props: {
     }
   }
 
-  const sendMoveReplyMessage = async (hit: string) => {
+  const sendMoveReplyMessage = async (hit: string, proof: any) => {
     /*
       1/ Create a message
       2/ Serialize the message
@@ -575,6 +595,7 @@ function PlayerBoard(props: {
       timestamp: Date.now(),
       hit:hit,
       sender: player,
+      moveProof: JSON.stringify(proof),
       id: crypto.randomUUID()
     });
 

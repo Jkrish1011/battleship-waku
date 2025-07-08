@@ -68,6 +68,7 @@ const MoveReplyMessage = new protobuf.Type("MoveReplyMessage")
   .add(new protobuf.Field("timestamp", 1, "uint64"))
   .add(new protobuf.Field("sender", 2, "string"))
   .add(new protobuf.Field("hit", 6, "string")) // hit/miss
+  .add(new protobuf.Field("moveProof", 9, "string")) 
   .add(new protobuf.Field("id", 4, "string"));
 
 const BoardProofMessage = new protobuf.Type("BoardProofMessage")
