@@ -42,22 +42,21 @@ const Container = (props: {
         // 1. Define a decodeMessage function
         // 2. Map over filterMessages using decodeMessage function
         const decodedMessages = filterMessages.map((item) => decodeMessage(item, ''));
-        console.log(decodedMessages);
-        if(decodedMessages) {
-            setMessages(decodedMessages as Message[]);
+        console.log({decodedMessages});
+        if(decodedMessages.length > 0) {
             const _latestMessage = findLatestMessage(decodedMessages as Message[]);
-            console.log(_latestMessage?.sender);
-            console.log({player});
             // If the latest message is not from the sender itself, do not process. Only process from the opponent.
             if(_latestMessage?.sender.toString().toLowerCase() !== player.toString().toLowerCase() ) {
                 if(_latestMessage?.proof) {
-                    console.log("Setting opponent proofs!");
                     setOpponentProofs(JSON.parse(_latestMessage.proof));
                 } else if (_latestMessage?.calldata) {
                     setOpponentCalldataProofs(JSON.parse(_latestMessage.calldata));
                 } else if(_latestMessage?.message || _latestMessage?.move || _latestMessage?.hit) {
                     setLatestMessage(_latestMessage);
                 }
+                setMessages(decodedMessages as Message[]);
+            } else if(_latestMessage?.message === "ready" || _latestMessage?.message === "joined") {
+                setMessages(decodedMessages as Message[]);
             }
         }
     }, [filterMessages]);
@@ -65,7 +64,6 @@ const Container = (props: {
     useEffect(() => {
         console.log(`ships_${roomId}`);
         const _ships = localStorage.getItem(`ships_${roomId}`) || null;
-        console.log(_ships);
         if(_ships !== '' && _ships !== undefined && _ships !== null) {
             setLocalShips(JSON.parse(_ships));
         }

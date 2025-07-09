@@ -105,9 +105,9 @@ function PlayerBoard(props: {
       setWasmBuffer(wasm);
       setZkeyBuffer(zkey);
       setVerificationJson(verificationJson);
-      setMoveWasmBuffer(wasm);
-      setMoveZkeyBuffer(zkey);
-      setMoveVerificationJson(verificationJson);
+      setMoveWasmBuffer(moveWasm);
+      setMoveZkeyBuffer(moveZKey);
+      setMoveVerificationJson(moveVerificationJson);
     })
     .catch(err => {
       console.error("failed to load wasm or zkey:", err);
@@ -116,7 +116,6 @@ function PlayerBoard(props: {
 
   // Replace the ships if found in the localStorage
   useEffect(() => {
-    console.log({shipsLocal});
     if(shipsLocal != null) {
       for(let i=0; i < shipsLocal.length; i++) {
         const currShip = shipsLocal[i];
@@ -244,12 +243,9 @@ function PlayerBoard(props: {
       await gameGenerator.initialize();
       const battleshipWaku = await getContract(process.env.NEXT_PUBLIC_BATTLESHIP_CONTRACT_ADDRESS as string, battleshipWakuAbi.abi);
       const userAddress = address;
-      console.log({address});
-      console.log({joinedOrCreated});
       if(games.length > 0) {
         for(let i=0; i < games.length; i++) {
           const game = games[i];
-          console.log({game});
           if(game.gameId.toString() === gameId?.toString() && game.player1.toLowerCase() === address.toString().toLowerCase() && joinedOrCreated === "created") {
             existingGameFound_Player1 = true;
             toast.success("You had already joined the game on-chain. Please continue playing.");
@@ -260,8 +256,6 @@ function PlayerBoard(props: {
             return;
           }
         }
-        console.log({existingGameFound_Player1});
-        console.log({existingGameFound_Player2});
         if(joinedOrCreated === "created" && existingGameFound_Player1 === false) {
           let _gameId = gameId;
           if(!_gameId) {
@@ -304,7 +298,7 @@ function PlayerBoard(props: {
       const gameGenerator = new BattleshipGameGenerator();
       await gameGenerator.initialize();
       const correctInput = await gameGenerator.generateCorrectInput(shipPlacement);
-      localStorage.setItem(CURRENT_BOARD_INPUT_STATE, correctInput);
+      localStorage.setItem(CURRENT_BOARD_INPUT_STATE, JSON.stringify(correctInput));
       const {proof: _proofPlayer, calldata: _calldataPlayer} = await gameGenerator.generateProof(correctInput, wasmBuffer as Uint8Array, zkeyBuffer as Uint8Array);
       setProofPlayer(_proofPlayer);
       setCalldataPlayer(_calldataPlayer);
@@ -330,7 +324,7 @@ function PlayerBoard(props: {
 
     try {
       const gameGenerator = new BattleshipGameGenerator();
-      const boardState = localStorage.getItem(CURRENT_BOARD_INPUT_STATE);
+      const boardState = JSON.parse(localStorage.getItem(CURRENT_BOARD_INPUT_STATE));
       await gameGenerator.initialize();
       const moveInput = {
         salt: boardState.salt,
@@ -341,7 +335,10 @@ function PlayerBoard(props: {
         guess_y: y,
         hit: hit
       };
-      const {proof: _proofPlayer, calldata: _calldataPlayer} = await gameGenerator.generateProof(correctInput, moveWasmBuffer as Uint8Array, moveZkeyBuffer as Uint8Array);
+      console.log(moveInput);
+      console.log(moveWasmBuffer);
+      console.log(moveZkeyBuffer);
+      const {proof: _proofPlayer, calldata: _calldataPlayer} = await gameGenerator.generateProof(moveInput, moveWasmBuffer as Uint8Array, moveZkeyBuffer as Uint8Array);
       
       return {proof: _proofPlayer, calldata: _calldataPlayer};
 
