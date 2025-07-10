@@ -12,4 +12,5 @@ export type Message = {
   hit?: string;
   proof?: string;
   calldata?: string;
+  moveProof?: string;
 };

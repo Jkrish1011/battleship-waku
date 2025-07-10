@@ -27,6 +27,7 @@ const Container = (props: {
     const [latestMessage, setLatestMessage] = useState<Message>();
     const [opponentProofs, setOpponentProofs] = useState<Message>();
     const [opponentCalldataProofs, setOpponentCalldataProofs] = useState<Message>();
+    const [opponentMoveProofs, setOpponentMoveProofs] = useState<Message>();
     const [localShips, setLocalShips] = useState<Ship[]>();
     // This provides the node which we will use for the communication.
     const { node, isLoading, error} = useWaku();
@@ -51,8 +52,11 @@ const Container = (props: {
                     setOpponentProofs(JSON.parse(_latestMessage.proof));
                 } else if (_latestMessage?.calldata) {
                     setOpponentCalldataProofs(JSON.parse(_latestMessage.calldata));
-                } else if(_latestMessage?.message || _latestMessage?.move || _latestMessage?.hit) {
+                } else if(_latestMessage?.message || _latestMessage?.move) {
                     setLatestMessage(_latestMessage);
+                } else if(_latestMessage?.hit || _latestMessage?.moveProof) {
+                    console.log("move proofs received!");
+                    setOpponentMoveProofs(_latestMessage);
                 }
                 setMessages(decodedMessages as Message[]);
             } else if(_latestMessage?.message === "ready" || _latestMessage?.message === "joined") {
@@ -91,6 +95,7 @@ const Container = (props: {
                     gameId={gameId}
                     opponentProofs={opponentProofs}
                     opponentCalldataProofs={opponentCalldataProofs}
+                    opponentMoveProofs={opponentMoveProofs}
                     localShips={localShips}
                 />
 

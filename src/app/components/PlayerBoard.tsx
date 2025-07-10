@@ -25,9 +25,19 @@ function PlayerBoard(props: {
   gameId?: string,
   opponentProofs?: Message | null,
   opponentCalldataProofs?: Message | null,
+  opponentMoveProofs?: any[], // changed to array for tabbed UI
   localShips?: Ship[]
 }) {
-  const {node, encoder, isLoading, player, latestMessage, roomId, joinedOrCreated, gameId, opponentProofs, localShips, opponentCalldataProofs} = props;
+  const {node, encoder, isLoading, player, latestMessage, roomId, joinedOrCreated, gameId, opponentProofs, localShips, opponentCalldataProofs, opponentMoveProofs} = props;
+const [selectedOpponentProofTab, setSelectedOpponentProofTab] = useState(0);
+
+// Reset tab when new proof(s) arrive
+useEffect(() => {
+  if (Array.isArray(opponentMoveProofs) && opponentMoveProofs.length > 0) {
+    setSelectedOpponentProofTab(opponentMoveProofs.length - 1);
+  }
+}, [opponentMoveProofs?.length]);
+
   const CURRENT_BOARD_INPUT_STATE = `board_${roomId}_input_state`;
   const [wasmBuffer, setWasmBuffer] = useState<Uint8Array|null>(null);
   const [moveWasmBuffer, setMoveWasmBuffer] = useState<Uint8Array|null>(null);
@@ -335,9 +345,6 @@ function PlayerBoard(props: {
         guess_y: y,
         hit: hit
       };
-      console.log(moveInput);
-      console.log(moveWasmBuffer);
-      console.log(moveZkeyBuffer);
       const {proof: _proofPlayer, calldata: _calldataPlayer} = await gameGenerator.generateProof(moveInput, moveWasmBuffer as Uint8Array, moveZkeyBuffer as Uint8Array);
       
       return {proof: _proofPlayer, calldata: _calldataPlayer};
@@ -623,10 +630,19 @@ function PlayerBoard(props: {
   return (
     <>
     <div className="relative">
-      { isLoadingProof && (
-        <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black bg-opacity-40 w-full">
-          <Image src={`/shooting${joinedOrCreated === "created" ? "1" : "2"}.webp`} alt="Loading..." width={420} height={320} priority />
-          <span className="text-white mt-4 font-bold text-lg">Generating proof and sending transaction...</span>
+      {isLoadingProof && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center w-full h-full backdrop-blur-sm bg-black/30">
+          <div className="bg-white/80 rounded-xl shadow-2xl px-8 py-8 flex flex-col items-center min-w-[320px]">
+            <div className="mb-4">
+              {/* <svg className="animate-spin h-10 w-10 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+              </svg> */}
+              <Image src={`/shooting${joinedOrCreated === "created" ? "1" : "2"}.webp`} alt="Loading..." width={420} height={320} priority />
+            </div>
+            <span className="text-gray-800 font-semibold text-lg mb-1">Generating Proof</span>
+            <span className="text-gray-500 text-sm text-center">Please wait while we generate your proof and send the transaction…</span>
+          </div>
         </div>
       )}
       <div className={`grid grid-cols-2 gap-4 ${isLoadingProof ? 'pointer-events-none opacity-50' : ''}`}> 
@@ -715,7 +731,7 @@ function PlayerBoard(props: {
         </div>
       </div>
       )}
-      {calldataProofOpponentPlayer && (
+       {calldataProofOpponentPlayer && (
       <div id="proof-container" className="mt-8 p-4 bg-gray-50 rounded-lg border border-gray-200">
         <div className="space-y-4">
           <h3 className="font-bold mb-2">Opponent Board Proof</h3>
@@ -740,6 +756,51 @@ function PlayerBoard(props: {
           </button>
         </div>
       </div>
+      )}
+      {Array.isArray(opponentMoveProofs) && opponentMoveProofs.length > 0 && (
+        <div id="proof-container" className="mt-8 p-4 bg-gray-50 rounded-lg border border-gray-200">
+          <div className="space-y-4">
+            <h3 className="font-bold mb-2">Opponent Move Proofs</h3>
+            <div className="mb-4 flex space-x-2">
+              {opponentMoveProofs.map((_, idx) => (
+                <button
+                  key={idx}
+                  className={`px-4 py-2 rounded-t font-semibold border-b-2 transition-colors duration-150 ${selectedOpponentProofTab === idx ? 'border-blue-600 bg-white' : 'border-transparent bg-gray-200 hover:bg-gray-300'}`}
+                  onClick={() => setSelectedOpponentProofTab(idx)}
+                >
+                  Proof {idx + 1}
+                </button>
+              ))}
+            </div>
+            {(() => {
+              const proof = opponentMoveProofs[selectedOpponentProofTab];
+              if (!proof) return null;
+              let calldata;
+              try {
+                calldata = Array.isArray(proof) ? proof : JSON.parse(proof.moveProof || proof.calldata || proof);
+              } catch {
+                calldata = proof;
+              }
+              const _p = {
+                pA: calldata[0]?.toString(),
+                pB: calldata[1]?.toString(),
+                pC: calldata[2]?.toString(),
+                publicInput: calldata[3]?.toString(),
+              };
+              return (
+                <>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Proof</label>
+                  <textarea id="proof" className="w-full h-40 p-3 bg-gray-100 rounded font-mono text-sm resize-y" readOnly>
+                    {JSON.stringify(_p, null, 2)}
+                  </textarea>
+                  <button id="verifyProofs" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded transition-colors mt-4" onClick={verifyOpponentProofs}>
+                    Verify Proof In-Browser
+                  </button>
+                </>
+              );
+            })()}
+          </div>
+        </div>
       )}
       {/* Transaction details section */}
       <div className="mt-6 p-4 bg-gray-100 rounded shadow">
