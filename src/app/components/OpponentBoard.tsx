@@ -2,16 +2,15 @@
 import React, { useState, useEffect } from "react";
 import { Player, Message } from "../types";
 import { createBoard, MoveMessage } from "../utils/gameUtils";
-import { useLightPush } from "@waku/react";
+
 
 const OpponentBoard = (props: {
     player: Player,
     node: any,
-    encoder: any,
     latestMessage?: Message,
     roomId: string
 }) => {
-    const {node, encoder, player, latestMessage, roomId} = props;
+    const {node, player, latestMessage, roomId} = props;
     const [board, setBoard] = useState(createBoard());
     const [move, setMove] = useState<string>('');
     

@@ -119,10 +119,17 @@ const useWallet = create((set, get) => ({
   }
 }));
 
-// const useGames = create((set, get) => ({
-//   games: null,
-//   setGames: (games: any[]) => set({ games }),
-//   getGames: () => get().games as any[],
+// type BattleshipPeerIdState = {
+//   peerId: string | null;
+//   setPeerId: (peerId: string) => void;
+//   getPeerId: () => string | null;
+// };
+
+// const battleshipPeerId = create<BattleshipPeerIdState>((set, get) => ({
+//   peerId: null,
+//   setPeerId: (peerId: string) => set({ peerId }),
+//   getPeerId: () => get().peerId,
 // }));
+
 
 export { useWallet };

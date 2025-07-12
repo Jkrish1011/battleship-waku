@@ -83,7 +83,7 @@ const BoardProofCalldataMessage = new protobuf.Type("BoardProofCalldataMessage")
   .add(new protobuf.Field("calldata", 8, "string"))
   .add(new protobuf.Field("id", 4, "string"));
 
-const decodeMessage = (wakuMessage: any, type: string) => {
+const decodeMessage = (wakuMessage: any) => {
   if (!wakuMessage.payload) {
     console.log("No payload found!");
     return {};
