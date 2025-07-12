@@ -2,18 +2,19 @@
 import React, { useState, useEffect } from "react";
 import { Player, Message } from "../types";
 import { createBoard, MoveMessage } from "../utils/gameUtils";
-
+import { createWakuEncoder } from "@/app/WakuService";
 
 const OpponentBoard = (props: {
     player: Player,
     node: any,
     latestMessage?: Message,
-    roomId: string
+    roomId: string,
+    contentTopic: string
 }) => {
-    const {node, player, latestMessage, roomId} = props;
+    const {node, player, latestMessage, roomId, contentTopic} = props;
     const [board, setBoard] = useState(createBoard());
     const [move, setMove] = useState<string>('');
-    
+    const encoder = createWakuEncoder(contentTopic);
     const handleHit = (hit: string) => {
       const newBoard = [...board];
       const rowIndex = parseInt(move.split(',')[0]);
@@ -44,7 +45,7 @@ const OpponentBoard = (props: {
       }
     }, [latestMessage]);
 
-    const { push } = useLightPush({node, encoder});
+    // const { push } = useLightPush({node, encoder});
 
     const sendMoveMessage = async (rowIndex: any, colIndex: any) => {
       console.log("sending move message");
@@ -61,15 +62,26 @@ const OpponentBoard = (props: {
       const serializedMessage = MoveMessage.encode(newMessage).finish();
 
       // 3/ Push Message
-      if (push) {
-        const pushRes = await push({
-          timestamp: new Date(),
-          payload: serializedMessage
-        });
+      // if (push) {
+      //   const pushRes = await push({
+      //     timestamp: new Date(),
+      //     payload: serializedMessage
+      //   });
         
-        if (pushRes?.errors?.length && pushRes?.errors?.length) {
-          alert('unable to connect to a stable node. please reload the page!');
-        }
+      //   if (pushRes?.errors?.length && pushRes?.errors?.length) {
+      //     alert('unable to connect to a stable node. please reload the page!');
+      //   }
+      // }
+
+      const result = await node.lightPush.send(encoder, {
+        payload: serializedMessage,
+        timestamp: new Date(),
+      }, { autoRetry: true });
+
+      if (result.successes.length > 0) {
+        console.log(`message sent successfully.`);
+      } else {
+        console.warn(`Failed to send message:`, result.failures);
       }
     }
 

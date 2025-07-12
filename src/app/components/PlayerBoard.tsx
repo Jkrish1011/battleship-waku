@@ -34,8 +34,7 @@ function PlayerBoard(props: {
     console.log("No content topic found!");
     return;
   }
-  console.log("The content topic is");
-  console.log({contentTopic});
+  
   const encoder = createWakuEncoder(contentTopic);
 
   // Reset tab when new proof(s) arrive

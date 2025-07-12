@@ -1,4 +1,4 @@
-
+// @ts-nocheck
 
 'use client'
 
@@ -25,7 +25,7 @@ const Container = (props: {
 
     const {player, roomId, joinedOrCreated, gameId, contentTopic} = props;
     const {address} = useWallet() as {address: string | null};
-    const [messages, setMessages] = useState<Message>();
+    const [messages, setMessages] = useState<Message[]>();
     const [latestMessage, setLatestMessage] = useState<Message>();
     const [opponentProofs, setOpponentProofs] = useState<Message>();
     const [opponentCalldataProofs, setOpponentCalldataProofs] = useState<Message>();
@@ -91,8 +91,8 @@ const Container = (props: {
             if (decodedMessage) {    
                 console.log("Decoded messages:", decodedMessage);
                 const _latestMessage = decodedMessage;
-                console.log("_latestMessage")
-                console.log({_latestMessage});
+                console.log("latestMessage")
+                console.log({latestMessage});
                 // If the latest message is not from the sender itself, do not process. Only process from the opponent.
                 if(_latestMessage?.sender.toString().toLowerCase() !== player.toString().toLowerCase() ) {
                     if(_latestMessage?.proof) {
@@ -107,9 +107,9 @@ const Container = (props: {
                         console.log({opponentMoveProofs});
                         setOpponentMoveProofs([opponentMoveProofs, _latestMessage]);
                     }
-                    setMessages(decodedMessage);
+                    setMessages(prevMessages => [...(prevMessages || []), _latestMessage]);
                 } else if(_latestMessage?.message === "ready" || _latestMessage?.message === "joined") {
-                    setMessages(decodedMessage);
+                    setMessages(prevMessages => [...(prevMessages || []), _latestMessage]);
                 }
             } else {
                 console.warn("Could not decode received Waku message. Payload might be malformed or not a ChatMessage.");
@@ -156,7 +156,7 @@ const Container = (props: {
                         <h1 className="text-lg font-bold text-center">
                             Opponent Board
                         </h1>
-                        <OpponentBoard player={player} node={wakuNode} latestMessage={latestMessage} roomId={roomId} />
+                        <OpponentBoard player={player} node={wakuNode} latestMessage={latestMessage} roomId={roomId} contentTopic={contentTopic}/>
                     </div>
                 }
             </div>
@@ -165,14 +165,16 @@ const Container = (props: {
                 <h3 className="text-lg font-semibold border-b border-gray-700 pb-2 mb-4">Messages:</h3>
                 <ul className="space-y-2 overflow-y-auto max-h-50">
                     {
-                        messages && (
-                            <li key={messages.id} className={`flex items-center ${messages.sender === Player.p1? `justify-end`: `justify-start`}`}>
-                            <div className={`${messages.sender === Player.p1 ? 'bg-blue-500': 'bg-green-500'} text-sm text-white py-2 px-4 rounded-lg max-w-xs`}>
-                                <p className="font-bold">{messages.sender}</p>
-                                <p>{messages.move || messages.message }</p>
-                            </div>
-                        </li>
-                        )
+                        messages && messages.map((_message: Message, idx) => {
+                            return (
+                                <li key={idx} className={`flex items-center ${_message.sender === Player.p1? `justify-end`: `justify-start`}`}>
+                                    <div className={`${_message.sender === Player.p1 ? 'bg-blue-500': 'bg-green-500'} text-sm text-white py-2 px-4 rounded-lg max-w-xs`}>
+                                        <p className="font-bold">{_message.sender}</p>
+                                        <p>{_message.move || _message.message }</p>
+                                    </div>
+                                </li>
+                            )
+                        })
                     }
                 </ul>
             </div>

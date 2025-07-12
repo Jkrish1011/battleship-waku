@@ -3,17 +3,21 @@ import { Message, Player } from "../types";
 import protobuf from "protobufjs";
 import { ethers } from "ethers";
 
-const isGameReady = (gameMessage: Message): boolean => {
+const isGameReady = (gameMessages: Message[]): boolean => {
   // return true;
 
-  // const gameMessagesCleaned = gameMessage.map((_gameMessage: Message) => ({
-  //   sender: _gameMessage.sender,
-  //   message: _gameMessage.message,
-  // }));
+  const gameMessagesCleaned = gameMessages.map((_gameMessage: Message) => ({
+    sender: _gameMessage.sender,
+    message: _gameMessage.message,
+  }));
 
-  const playerP1Ready = gameMessage.sender === "p1" && gameMessage.message === "ready";
+  const playerP1Ready = gameMessagesCleaned.some(
+    (event) => event.sender === "p1" && event.message === "ready"
+  );
 
-  const playerP2Ready = gameMessage.sender === "p2" && gameMessage.message === "ready";
+  const playerP2Ready = gameMessagesCleaned.some(
+    (event) => event.sender === "p2" && event.message === "ready"
+  );
 
   return playerP1Ready && playerP2Ready;
 };
