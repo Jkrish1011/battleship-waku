@@ -1,5 +1,7 @@
 import React, { useEffect } from 'react';
 import { useWallet } from '../store/useWallet';
+import { useWaku } from '../WakuProvider';
+import Spinner from './Spinner';
 
 const NavBar = () => {
     const { 
@@ -12,6 +14,7 @@ const NavBar = () => {
         initializeWalletListeners, 
         cleanupWalletListeners 
     } = useWallet() as any;
+    const { peerId, loading, error } = useWaku() as any;
     
     const shortenAddress = (address: string) => {
         return `${address.slice(0, 6)}...${address.slice(-4)}`;
@@ -28,6 +31,10 @@ const NavBar = () => {
         };
     }, []);
 
+    useEffect(() => {
+        console.log({error});
+    }, [error]);
+    
     return (
         <div className='sticky top-0 z-50 w-full bg-white border-b border-gray-200 shadow-sm backdrop-blur-sm bg-white/95'>
             <div className='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'>
@@ -44,6 +51,11 @@ const NavBar = () => {
                         ) : isConnected && address ? (
                             <>
                             <div className='flex items-center gap-3'>
+                                <div className='flex items-center gap-2 px-3 py-2 bg-gray-100 rounded-lg'>
+                                    <div className='w-2 h-2 bg-green-500 rounded-full'></div>
+                                    {loading ? <Spinner /> : <span className='text-sm font-medium text-gray-700'>{peerId}</span>}
+                                    {error && <span className='text-sm font-medium text-red-500'>Error: check console</span>}
+                                </div>
                                 <div className='flex items-center gap-2 px-3 py-2 bg-gray-100 rounded-lg'>
                                     <div className='w-2 h-2 bg-green-500 rounded-full'></div>
                                     <span className='text-sm font-medium text-gray-700'>{shortenAddress(address)}</span>

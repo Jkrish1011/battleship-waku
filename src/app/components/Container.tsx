@@ -7,63 +7,63 @@ import React, { useState, useEffect } from "react";
 import PlayerBoard from "./PlayerBoard";
 import { Player, Message } from "../types";
 import OpponentBoard from "./OpponentBoard";
-import { useContentPair, useFilterMessages, useWaku } from "@waku/react";
-import { Ship } from "../utils/gameUtils";
 import { decodeMessage, isGameReady , Ship} from "../utils/gameUtils";
 import Spinner from "./Spinner";
 import { findLatestMessage } from "../utils";
 import { useWallet } from "../store/useWallet";
+import { useWaku } from "@/app/WakuProvider";
+import { createWakuDecoder } from "@/app/WakuService";
+import { DecodedMessage } from "@waku/sdk";
 
 const Container = (props: {
     player: Player,
     roomId?: string,
     joinedOrCreated: string,
-    gameId?: string
+    gameId?: string,
+    contentTopic: string
 }) => {
 
-    const {player, roomId, joinedOrCreated, gameId} = props;
+    const {player, roomId, joinedOrCreated, gameId, contentTopic} = props;
     const {address} = useWallet() as {address: string | null};
     const [messages, setMessages] = useState<Message[]>();
     const [latestMessage, setLatestMessage] = useState<Message>();
     const [opponentProofs, setOpponentProofs] = useState<Message>();
     const [opponentCalldataProofs, setOpponentCalldataProofs] = useState<Message>();
-    const [opponentMoveProofs, setOpponentMoveProofs] = useState<Message>();
+    const [opponentMoveProofs, setOpponentMoveProofs] = useState<Message[]>();
     const [localShips, setLocalShips] = useState<Ship[]>();
     // This provides the node which we will use for the communication.
-    const { node, isLoading, error} = useWaku();
-
-    // Provides the utility to decode and encode the messages from waku.
-    const {decoder, encoder} = useContentPair();
+    const { wakuNode, peerId, loading, error } = useWaku();
 
     // Array of all the messages which are sent over the content topic(particular to this example)
     
-    const {messages: filterMessages} = useFilterMessages({node, decoder});
+    // const {messages: filterMessages} = useFilterMessages({node, decoder});
 
-    useEffect(() => {
-        // 1. Define a decodeMessage function
-        // 2. Map over filterMessages using decodeMessage function
-        const decodedMessages = filterMessages.map((item) => decodeMessage(item, ''));
-        console.log({decodedMessages});
-        if(decodedMessages.length > 0) {
-            const _latestMessage = findLatestMessage(decodedMessages as Message[]);
-            // If the latest message is not from the sender itself, do not process. Only process from the opponent.
-            if(_latestMessage?.sender.toString().toLowerCase() !== player.toString().toLowerCase() ) {
-                if(_latestMessage?.proof) {
-                    setOpponentProofs(JSON.parse(_latestMessage.proof));
-                } else if (_latestMessage?.calldata) {
-                    setOpponentCalldataProofs(JSON.parse(_latestMessage.calldata));
-                } else if(_latestMessage?.message || _latestMessage?.move) {
-                    setLatestMessage(_latestMessage);
-                } else if(_latestMessage?.hit || _latestMessage?.moveProof) {
-                    console.log("move proofs received!");
-                    setOpponentMoveProofs(_latestMessage);
-                }
-                setMessages(decodedMessages as Message[]);
-            } else if(_latestMessage?.message === "ready" || _latestMessage?.message === "joined") {
-                setMessages(decodedMessages as Message[]);
-            }
-        }
-    }, [filterMessages]);
+    // useEffect(() => {
+    //     // 1. Define a decodeMessage function
+    //     // 2. Map over filterMessages using decodeMessage function
+    //     const decodedMessages = filterMessages.map((item) => decodeMessage(item, ''));
+    //     console.log({decodedMessages});
+    //     if(decodedMessages.length > 0) {
+    //         const _latestMessage = findLatestMessage(decodedMessages as Message[]);
+    //         // If the latest message is not from the sender itself, do not process. Only process from the opponent.
+    //         if(_latestMessage?.sender.toString().toLowerCase() !== player.toString().toLowerCase() ) {
+    //             if(_latestMessage?.proof) {
+    //                 setOpponentProofs(JSON.parse(_latestMessage.proof));
+    //             } else if (_latestMessage?.calldata) {
+    //                 setOpponentCalldataProofs(JSON.parse(_latestMessage.calldata));
+    //             } else if(_latestMessage?.message || _latestMessage?.move) {
+    //                 setLatestMessage(_latestMessage);
+    //             } else if(_latestMessage?.hit || _latestMessage?.moveProof) {
+    //                 console.log("move proofs received!");
+    //                 console.log({opponentMoveProofs});
+    //                 setOpponentMoveProofs([opponentMoveProofs, _latestMessage]);
+    //             }
+    //             setMessages(decodedMessages as Message[]);
+    //         } else if(_latestMessage?.message === "ready" || _latestMessage?.message === "joined") {
+    //             setMessages(decodedMessages as Message[]);
+    //         }
+    //     }
+    // }, [filterMessages]);
 
     useEffect(() => {
         console.log(`ships_${roomId}`);
@@ -73,10 +73,59 @@ const Container = (props: {
         }
     }, []);
 
-    if (isLoading) {
+    const subscribeToMessages = async () => {
+        if (!contentTopic) {
+            console.log("No content topic found!");
+            return;
+        }
+        console.log("The content topic is");
+        console.log({contentTopic});
+        const decoder = createWakuDecoder(contentTopic);
+        console.log("Subscribing to messages...");
+        await wakuNode?.nextFilter.subscribe(decoder, (wakuMessage: DecodedMessage) => { 
+            console.log("Raw Waku message received, payload length:", wakuMessage.payload.length);
+            const decodedMessage = decodeMessage(wakuMessage);
+            console.log('wakuMessage.payload');
+            console.log(wakuMessage.payload);
+            
+            if (decodedMessage) {    
+                console.log("Decoded messages:", decodedMessage);
+                const _latestMessage = decodedMessage;
+                console.log("latestMessage")
+                console.log({latestMessage});
+                // If the latest message is not from the sender itself, do not process. Only process from the opponent.
+                if(_latestMessage?.sender.toString().toLowerCase() !== player.toString().toLowerCase() ) {
+                    if(_latestMessage?.proof) {
+                        setOpponentProofs(JSON.parse(_latestMessage.proof));
+                    } else if (_latestMessage?.calldata) {
+                        setOpponentCalldataProofs(JSON.parse(_latestMessage.calldata));
+                    } else if(_latestMessage?.message || _latestMessage?.move) {
+                        console.log("Setting the latest messages!");
+                        setLatestMessage(_latestMessage as Message);
+                    } else if(_latestMessage?.hit || _latestMessage?.moveProof) {
+                        console.log("move proofs received!");
+                        console.log({opponentMoveProofs});
+                        setOpponentMoveProofs([opponentMoveProofs, _latestMessage]);
+                    }
+                    setMessages(prevMessages => [...(prevMessages || []), _latestMessage]);
+                } else if(_latestMessage?.message === "ready" || _latestMessage?.message === "joined") {
+                    setMessages(prevMessages => [...(prevMessages || []), _latestMessage]);
+                }
+            } else {
+                console.warn("Could not decode received Waku message. Payload might be malformed or not a ChatMessage.");
+            }
+        });
+        console.log("Subscription active.");
+      };
+
+
+    useEffect(() => {
+        subscribeToMessages();
+    }, [wakuNode]);
+
+    if (loading) {
         return <Spinner />
     }
-
     return (
         <div className="grid grid-cols-2 gap-4">
             <div className="flex flex-col">
@@ -86,10 +135,9 @@ const Container = (props: {
                 <PlayerBoard 
                     latestMessage={latestMessage}
                     player={player} 
-                    node={node}
-                    isLoading={isLoading}
+                    node={wakuNode}
+                    isLoading={loading}
                     error={error}
-                    encoder={encoder}
                     roomId={roomId || ''}
                     joinedOrCreated={joinedOrCreated}
                     gameId={gameId}
@@ -97,6 +145,7 @@ const Container = (props: {
                     opponentCalldataProofs={opponentCalldataProofs}
                     opponentMoveProofs={opponentMoveProofs}
                     localShips={localShips}
+                    contentTopic={contentTopic}
                 />
 
                 {
@@ -107,7 +156,7 @@ const Container = (props: {
                         <h1 className="text-lg font-bold text-center">
                             Opponent Board
                         </h1>
-                        <OpponentBoard player={player} encoder={encoder} node={node} latestMessage={latestMessage} roomId={roomId} />
+                        <OpponentBoard player={player} node={wakuNode} latestMessage={latestMessage} roomId={roomId} contentTopic={contentTopic}/>
                     </div>
                 }
             </div>

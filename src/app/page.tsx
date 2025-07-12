@@ -1,16 +1,25 @@
+// @ts-nocheck
+
 "use client"
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import NavBar from "./components/NavBar";
 import { useWallet } from "./store/useWallet";
+import { useWaku } from "@/app/WakuProvider";
+import {useEffect} from "react";
 
 export default function Home() {
 
   const router = useRouter();
+  const { peerId, loading, error } = useWaku() as any;
   const { address } = useWallet() as any;
   const handleClick = () => {
     router.push('/room');
   };
+
+useEffect(() => {
+  console.log({loading});
+}, [loading]);
 
   return (
     <>
@@ -23,13 +32,13 @@ export default function Home() {
         {address ? (
           <button 
             onClick={handleClick}
-            className="mt-4 bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+            className={`mt-4 bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded ${loading ? 'cursor-not-allowed' : ''}`}
           >
             Click here to begin
           </button>
         ) : (
           <div 
-            className="mt-4 text-gray-500 text-center text-lg font-bold"
+            className={`mt-4 text-gray-500 text-center text-lg font-bold`}
           >
             Connect your wallet to begin
           </div>

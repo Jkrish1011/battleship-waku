@@ -3,10 +3,9 @@
 import React from "react";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import { LightNodeProvider } from "@waku/react";
-import { Protocols } from "@waku/sdk";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import WakuProvider from "./WakuProvider";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -19,17 +18,14 @@ export default function RootLayout({
     - LightPush - allows us to send messages
     - Filter - Receive the messages
   */
-  return (
-    <LightNodeProvider
-    options={{defaultBootstrap: true}}
-    protocols={[Protocols.Filter, Protocols.LightPush]}
-    >
+  return (    
     <html lang="en">
       <body className={inter.className}>
         <ToastContainer />
-        {children}
+        <WakuProvider>
+          {children}
+        </WakuProvider>
       </body>
     </html>
-    </LightNodeProvider>
   );
 }

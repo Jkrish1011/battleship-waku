@@ -117,10 +117,12 @@ export function findLatestMessage(messages: Message[]): Message | undefined {
   if (!messages || messages.length === 0) {
     return undefined;
   }
-
-  return messages.reduce(
+  console.log("findLatestMessage")
+  let msg = messages.reduce(
     (latest, current) =>
       current.timestamp > latest.timestamp ? current : latest,
     messages[0]
   );
+  console.log("latest message: ", {msg});
+  return msg;
 }
