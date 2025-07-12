@@ -10,7 +10,7 @@ import Navbar from "./../../components/NavBar";
 
 
 const Page = () => {
-    const [contentTopic, setContentTopic] = useState('');
+    const [contentTopic, setContentTopic] = useState(null);
     const searchParams = useParams();
     const queryParams = useSearchParams();
     const username = queryParams.get('username');
@@ -21,7 +21,7 @@ const Page = () => {
         console.log({roomId});
         const _contentTopic = `/waku-battle-ship-tutorial-${roomId}/1/private-message/proto`;
         setContentTopic(_contentTopic);
-    }, [roomId]);
+    }, []);
 
     return (
         // contentTopic is the way waku distinguish the particular message from all the other messages being passed through the network.

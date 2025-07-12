@@ -30,7 +30,12 @@ function PlayerBoard(props: {
 }) {
   const {node, isLoading, player, latestMessage, roomId, joinedOrCreated, gameId, opponentProofs, localShips, opponentCalldataProofs, opponentMoveProofs, contentTopic} = props;
   const [selectedOpponentProofTab, setSelectedOpponentProofTab] = useState(0);
-
+  if(!contentTopic) {
+    console.log("No content topic found!");
+    return;
+  }
+  console.log("The content topic is");
+  console.log({contentTopic});
   const encoder = createWakuEncoder(contentTopic);
 
   // Reset tab when new proof(s) arrive
@@ -516,7 +521,7 @@ function PlayerBoard(props: {
         2/ Serialize the message
         3/ Use push functionality to send the message
       */
-
+        console.log("Sending message...");
         // 1/ create message
         const newMessage = ChatMessage.create({
           timestamp: Date.now(),
