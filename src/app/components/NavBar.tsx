@@ -15,9 +15,9 @@ const NavBar = () => {
         cleanupWalletListeners 
     } = useWallet() as any;
     const { peerId, loading, error } = useWaku() as any;
-    
-    const shortenAddress = (address: string) => {
-        return `${address.slice(0, 6)}...${address.slice(-4)}`;
+
+    const shortenValue = (value: string) => {
+        return `${value.slice(0, 6)}...${value.slice(-4)}`;
     }
 
     useEffect(() => {
@@ -31,9 +31,9 @@ const NavBar = () => {
         };
     }, []);
 
-    useEffect(() => {
-        console.log({error});
-    }, [error]);
+    // useEffect(() => {
+    //     console.log({error});
+    // }, [error]);
     
     return (
         <div className='sticky top-0 z-50 w-full bg-white border-b border-gray-200 shadow-sm backdrop-blur-sm bg-white/95'>
@@ -53,12 +53,12 @@ const NavBar = () => {
                             <div className='flex items-center gap-3'>
                                 <div className='flex items-center gap-2 px-3 py-2 bg-gray-100 rounded-lg'>
                                     <div className='w-2 h-2 bg-green-500 rounded-full'></div>
-                                    {loading ? <Spinner /> : <span className='text-sm font-medium text-gray-700'>{peerId}</span>}
+                                    {loading ? <Spinner /> : <span className='text-sm font-medium text-gray-700'>Waku Peer ID: {shortenValue(peerId)}</span>}
                                     {error && <span className='text-sm font-medium text-red-500'>Error: check console</span>}
                                 </div>
                                 <div className='flex items-center gap-2 px-3 py-2 bg-gray-100 rounded-lg'>
                                     <div className='w-2 h-2 bg-green-500 rounded-full'></div>
-                                    <span className='text-sm font-medium text-gray-700'>{shortenAddress(address)}</span>
+                                    <span className='text-sm font-medium text-gray-700'>{shortenValue(address)}</span>
                                 </div>
                                 <button 
                                     onClick={() => disconnectWallet()} 

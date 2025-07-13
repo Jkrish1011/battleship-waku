@@ -24,26 +24,18 @@ function PlayerBoard(props: {
   gameId?: string,
   opponentProofs?: Message | null,
   opponentCalldataProofs?: Message | null,
-  opponentMoveProofs?: Message[], // changed to array for tabbed UI
+  opponentMoveProofs?: any, // changed to array for tabbed UI
   localShips?: Ship[],
   contentTopic: string
 }) {
   const {node, isLoading, player, latestMessage, roomId, joinedOrCreated, gameId, opponentProofs, localShips, opponentCalldataProofs, opponentMoveProofs, contentTopic} = props;
-  const [selectedOpponentProofTab, setSelectedOpponentProofTab] = useState(0);
+  
   if(!contentTopic) {
     console.log("No content topic found!");
     return;
   }
   
   const encoder = createWakuEncoder(contentTopic);
-
-  // Reset tab when new proof(s) arrive
-  useEffect(() => {
-    console.log("New proofs received!");
-    if (Array.isArray(opponentMoveProofs) && opponentMoveProofs.length > 0) {
-      setSelectedOpponentProofTab(opponentMoveProofs.length - 1);
-    }
-  }, [opponentMoveProofs?.length]);
 
     const CURRENT_BOARD_INPUT_STATE = `board_${roomId}_input_state`;
     const [wasmBuffer, setWasmBuffer] = useState<Uint8Array|null>(null);
@@ -61,13 +53,50 @@ function PlayerBoard(props: {
     const [txDetails, setTxDetails] = useState<any>(null);
     const [txError, setTxError] = useState<string|null>(null);
     const [proofPlayer, setProofPlayer] = useState<any>(null);
+    const [moveProofOpponentPlayer, setMoveProofOpponentPlayer] = useState<any>(null);
     const [calldataProofOpponentPlayer, setCalldataProofOpponentPlayer] = useState<any>(opponentCalldataProofs || null);
-    const [proofOpponentPlayer, setProofOpponentPlayer] = useState<any>(opponentProofs || null);
+    const [proofOpponentPlayer, setProofOpponentPlayer] = useState<any[]>([]);
     const [calldataPlayer, setCalldataPlayer] = useState<any>(null);
     const [verificationJson, setVerificationJson] = useState<string|null>(null);
     const [moveVerificationJson, setMoveVerificationJson] = useState<string|null>(null);
     const [shipsLocal, setShipsLocal] = useState<Ship[]>(localShips || []);
     const [games, setGames] = useState<any[]>([]);
+    const [selectedOpponentProofTab, setSelectedOpponentProofTab] = useState(0);
+    // Reset tab when new proof(s) arrive
+    useEffect(() => {
+      if (opponentMoveProofs && Array.isArray(opponentMoveProofs) && opponentMoveProofs.length > 0) {
+        opponentMoveProofs.filter((item) => {
+          if(item) {
+            setSelectedOpponentProofTab(opponentMoveProofs.length - 1);
+          }
+        })
+      }
+    }, [opponentMoveProofs]);
+
+    useEffect(() => {
+      setProofOpponentPlayer(opponentProofs as any);
+    }, [opponentProofs]);
+
+    // Filter and parse moveProofs, then setProofOpponentPlayer
+    useEffect(() => {
+      if (opponentMoveProofs && Array.isArray(opponentMoveProofs)) {
+        const validProofs = opponentMoveProofs.filter(Boolean);
+        
+        const parsedProofs = validProofs.map((item) => {
+          if (item && typeof item.moveProof === 'string') {
+            try {
+              const moveProof = JSON.parse(item.moveProof);
+              return { ...item, moveProof: moveProof };
+            } catch {
+              return item;
+            }
+          }
+          return item;
+        });
+        
+        setMoveProofOpponentPlayer(parsedProofs);
+      }
+    }, [opponentMoveProofs]);
     
     const doesShipExistOn = (rowIndex: number, colIndex: number, board: number[][]) => {
       return Boolean(board[rowIndex][colIndex]);
@@ -97,6 +126,7 @@ function PlayerBoard(props: {
       const hitOrMissNumeric = hitOrMissFlag? 1:0;
 
       const proof = await generateMoveProof(hitOrMissNumeric, rowIndex, colIndex );
+      console.log("proof", proof);
       // Create a new MoveReplyMessage
       // Send this message to the opponent board
       await sendMoveReplyMessage(hitOrMiss, proof);
@@ -148,12 +178,8 @@ function PlayerBoard(props: {
     }, [localShips]);
 
     useEffect(() => {
-      if (opponentProofs) {
-        setProofOpponentPlayer(opponentProofs);
-      }
-    }, [opponentProofs]);
-
-    useEffect(() => {
+      console.log("New Opponent calldata proofs received! inside PlayerBoard");
+      console.log(opponentCalldataProofs);
       if (opponentCalldataProofs) {
         setCalldataProofOpponentPlayer(opponentCalldataProofs);
       }
@@ -223,6 +249,29 @@ function PlayerBoard(props: {
       return isValid;
     }
 
+    const verifyOpponentMoveProofs = async () => {
+      console.log("verifying opponent move proofs");
+      const gameGenerator = new BattleshipGameGenerator();
+      await gameGenerator.initialize();
+      const proof = moveProofOpponentPlayer?.[selectedOpponentProofTab];
+      if (!proof) return null;
+      let proofData;
+      try {
+        proofData = JSON.parse(proof?.moveProof.proof || {});
+      } catch {
+        proofData = proof?.moveProof.proof;
+      }
+      console.log(proofData);
+      const isValid = await gameGenerator.verifyProof(moveVerificationJson, proofData);
+      console.log("Move isValid", isValid);
+      if(isValid) {
+        toast.success("Move Proof verified");
+      } else {
+        toast.error("Move Proof verification failed");
+      }
+      return isValid;
+    }
+
     const sendReadyToPlay = async () => {
       if(!areAllShipsPlaced()) {
         alert('Please place all ships before sending ready to play message');
@@ -243,6 +292,8 @@ function PlayerBoard(props: {
       console.log('Ready Message');
       await sendMessage(player, 'ready');
     }
+
+    
 
     const joinGame = async () => {
       if(!areAllShipsPlaced()) {
@@ -639,7 +690,7 @@ function PlayerBoard(props: {
       // 1/ create message
       const newMessage = MoveReplyMessage.create({
         timestamp: Date.now(),
-        hit:hit,
+        hit: hit,
         sender: player,
         moveProof: JSON.stringify(proof),
         id: crypto.randomUUID()
@@ -676,7 +727,7 @@ function PlayerBoard(props: {
       <>
       <div className="relative">
         {isLoadingProof && (
-          <div className="absolute inset-0 z-50 flex items-center justify-center w-full h-full backdrop-blur-sm bg-black/30">
+          <div className="absolute inset-0 z-50 flex items-center justify-center w-full h-[700px] backdrop-blur-sm bg-black/30">
             <div className="bg-white/80 rounded-xl shadow-2xl px-8 py-8 flex flex-col items-center min-w-[320px]">
               <div className="mb-4">
                 {/* <svg className="animate-spin h-10 w-10 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -756,19 +807,20 @@ function PlayerBoard(props: {
             <h3 className="font-bold mb-2">Your Board Proof</h3>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Proof</label>
-              <textarea id="proof" className="w-full h-40 p-3 bg-gray-100 rounded font-mono text-sm resize-y" readOnly>
-                {
-                  (() => {
-                    const _p = {
-                      pA: calldataPlayer[0].toString(),
-                      pB: calldataPlayer[1].toString(),
-                      pC: calldataPlayer[2].toString(),
-                      publicInput: calldataPlayer[3].toString(),
-                    };
-                    return JSON.stringify(_p, null, 2);
-                  })()
-                }
-              </textarea>
+              <textarea
+                id="proof"
+                className="w-full h-40 p-3 bg-gray-100 rounded font-mono text-sm resize-y"
+                readOnly
+                value={(() => {
+                  const _p = {
+                    pA: calldataPlayer[0].toString(),
+                    pB: calldataPlayer[1].toString(),
+                    pC: calldataPlayer[2].toString(),
+                    publicInput: calldataPlayer[3].toString(),
+                  };
+                  return JSON.stringify(_p, null, 2);
+                })()}
+              />
             </div>
             <button id="verifyProofs" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded transition-colors" onClick={verifyProofs}>
               Verify Proof In-Browser
@@ -782,19 +834,20 @@ function PlayerBoard(props: {
             <h3 className="font-bold mb-2">Opponent Board Proof</h3>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Proof</label>
-              <textarea id="proof" className="w-full h-40 p-3 bg-gray-100 rounded font-mono text-sm resize-y" readOnly>
-              {
-                  (() => {
-                    const _p = {
-                      pA: calldataProofOpponentPlayer[0].toString(),
-                      pB: calldataProofOpponentPlayer[1].toString(),
-                      pC: calldataProofOpponentPlayer[2].toString(),
-                      publicInput: calldataProofOpponentPlayer[3].toString(),
-                    };
-                    return JSON.stringify(_p, null, 2);
-                  })()
-                }
-              </textarea>
+              <textarea
+                id="proof"
+                className="w-full h-40 p-3 bg-gray-100 rounded font-mono text-sm resize-y"
+                readOnly
+                value={(() => {
+                  const _p = {
+                    pA: calldataProofOpponentPlayer[0].toString(),
+                    pB: calldataProofOpponentPlayer[1].toString(),
+                    pC: calldataProofOpponentPlayer[2].toString(),
+                    publicInput: calldataProofOpponentPlayer[3].toString(),
+                  };
+                  return JSON.stringify(_p, null, 2);
+                })()}
+              />
             </div>
             <button id="verifyProofs" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded transition-colors" onClick={verifyOpponentProofs}>
               Verify Proof In-Browser
@@ -804,12 +857,12 @@ function PlayerBoard(props: {
         )}
         {/* "@waku/react": "^0.0.7-559159a",
         "@waku/sdk": "^0.0.29", */}
-        {opponentMoveProofs && opponentMoveProofs?.length > 0 && (
+        {moveProofOpponentPlayer && moveProofOpponentPlayer?.length > 0 && (
           <div id="proof-container" className="mt-8 p-4 bg-gray-50 rounded-lg border border-gray-200">
             <div className="space-y-4">
               <h3 className="font-bold mb-2">Opponent Move Proofs</h3>
               <div className="mb-4 flex space-x-2">
-                {opponentMoveProofs?.map((_, idx) => (
+                {moveProofOpponentPlayer?.map((_: any, idx: number) => (
                   <button
                     key={idx}
                     className={`px-4 py-2 rounded-t font-semibold border-b-2 transition-colors duration-150 ${selectedOpponentProofTab === idx ? 'border-blue-600 bg-white' : 'border-transparent bg-gray-200 hover:bg-gray-300'}`}
@@ -820,28 +873,30 @@ function PlayerBoard(props: {
                 ))}
               </div>
               {(() => {
-                const proof = opponentMoveProofs?.[selectedOpponentProofTab];
+                const proof = moveProofOpponentPlayer?.[selectedOpponentProofTab];
                 if (!proof) return null;
                 let calldata;
                 try {
-                  calldata = JSON.parse(proof?.moveProof || "{}");
+                  calldata = JSON.parse(proof?.moveProof.calldata || "{}");
                 } catch {
-                  calldata = proof;
+                  calldata = proof?.moveProof.calldata;
                 }
                 const _p = {
-                  pA: calldata[0]?.toString(),
-                  pB: calldata[1]?.toString(),
-                  pC: calldata[2]?.toString(),
-                  publicInput: calldata[3]?.toString(),
+                  pA: calldata[0],
+                  pB: calldata[1],
+                  pC: calldata[2],
+                  publicInput: calldata[3],
                 };
+                
                 return (
                   <>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Proof</label>
-                    <textarea id="proof" className="w-full h-40 p-3 bg-gray-100 rounded font-mono text-sm resize-y" readOnly>
-                      {JSON.stringify(_p, null, 2)}
-                    </textarea>
-                    <button id="verifyProofs" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded transition-colors mt-4" onClick={verifyOpponentProofs}>
-                      Verify Proof In-Browser
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Move Proofs</label>
+                    <textarea id="proof" className="w-full h-40 p-3 bg-gray-100 rounded font-mono text-sm resize-y" 
+                    readOnly
+                    value={JSON.stringify(_p, null, 2)}
+                    />
+                    <button id="verifyProofs" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded transition-colors mt-4" onClick={verifyOpponentMoveProofs}>
+                      Verify Move Proofs In-Browser
                     </button>
                   </>
                 );

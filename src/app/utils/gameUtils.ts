@@ -101,11 +101,11 @@ const decodeMessage = (wakuMessage: any) => {
       if (move) {
         return { timestamp, sender, move, id };
       } else {
-        const { timestamp, sender, hit, id } = MoveReplyMessage.decode(
+        const { timestamp, sender, hit, moveProof, id } = MoveReplyMessage.decode(
           wakuMessage.payload
         );
         if(hit) {
-          return { timestamp, sender, hit, id };
+          return { timestamp, sender, hit, moveProof, id };
         } else{
           var { timestamp, sender, proof, id } = BoardProofMessage.decode(
             wakuMessage.payload

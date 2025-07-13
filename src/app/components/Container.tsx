@@ -26,44 +26,15 @@ const Container = (props: {
     const {player, roomId, joinedOrCreated, gameId, contentTopic} = props;
     const {address} = useWallet() as {address: string | null};
     const [messages, setMessages] = useState<Message[]>();
-    const [latestMessage, setLatestMessage] = useState<Message>();
-    const [opponentProofs, setOpponentProofs] = useState<Message>();
-    const [opponentCalldataProofs, setOpponentCalldataProofs] = useState<Message>();
-    const [opponentMoveProofs, setOpponentMoveProofs] = useState<Message[]>();
+    const [latestMessage, setLatestMessage] = useState<Message>(null);
+    const [opponentProofs, setOpponentProofs] = useState<Message>(null);
+    const [opponentCalldataProofs, setOpponentCalldataProofs] = useState<Message>(null);
+    const [opponentMoveProofs, setOpponentMoveProofs] = useState<Message[]>([]);
     const [localShips, setLocalShips] = useState<Ship[]>();
     // This provides the node which we will use for the communication.
     const { wakuNode, peerId, loading, error } = useWaku();
 
-    // Array of all the messages which are sent over the content topic(particular to this example)
-    
-    // const {messages: filterMessages} = useFilterMessages({node, decoder});
-
-    // useEffect(() => {
-    //     // 1. Define a decodeMessage function
-    //     // 2. Map over filterMessages using decodeMessage function
-    //     const decodedMessages = filterMessages.map((item) => decodeMessage(item, ''));
-    //     console.log({decodedMessages});
-    //     if(decodedMessages.length > 0) {
-    //         const _latestMessage = findLatestMessage(decodedMessages as Message[]);
-    //         // If the latest message is not from the sender itself, do not process. Only process from the opponent.
-    //         if(_latestMessage?.sender.toString().toLowerCase() !== player.toString().toLowerCase() ) {
-    //             if(_latestMessage?.proof) {
-    //                 setOpponentProofs(JSON.parse(_latestMessage.proof));
-    //             } else if (_latestMessage?.calldata) {
-    //                 setOpponentCalldataProofs(JSON.parse(_latestMessage.calldata));
-    //             } else if(_latestMessage?.message || _latestMessage?.move) {
-    //                 setLatestMessage(_latestMessage);
-    //             } else if(_latestMessage?.hit || _latestMessage?.moveProof) {
-    //                 console.log("move proofs received!");
-    //                 console.log({opponentMoveProofs});
-    //                 setOpponentMoveProofs([opponentMoveProofs, _latestMessage]);
-    //             }
-    //             setMessages(decodedMessages as Message[]);
-    //         } else if(_latestMessage?.message === "ready" || _latestMessage?.message === "joined") {
-    //             setMessages(decodedMessages as Message[]);
-    //         }
-    //     }
-    // }, [filterMessages]);
+    // Array of all the messages which are sent over the content topic(particular to this example
 
     useEffect(() => {
         console.log(`ships_${roomId}`);
@@ -78,21 +49,14 @@ const Container = (props: {
             console.log("No content topic found!");
             return;
         }
-        console.log("The content topic is");
-        console.log({contentTopic});
         const decoder = createWakuDecoder(contentTopic);
-        console.log("Subscribing to messages...");
         await wakuNode?.nextFilter.subscribe(decoder, (wakuMessage: DecodedMessage) => { 
             console.log("Raw Waku message received, payload length:", wakuMessage.payload.length);
             const decodedMessage = decodeMessage(wakuMessage);
-            console.log('wakuMessage.payload');
-            console.log(wakuMessage.payload);
             
             if (decodedMessage) {    
-                console.log("Decoded messages:", decodedMessage);
+                
                 const _latestMessage = decodedMessage;
-                console.log("latestMessage")
-                console.log({latestMessage});
                 // If the latest message is not from the sender itself, do not process. Only process from the opponent.
                 if(_latestMessage?.sender.toString().toLowerCase() !== player.toString().toLowerCase() ) {
                     if(_latestMessage?.proof) {
@@ -100,12 +64,13 @@ const Container = (props: {
                     } else if (_latestMessage?.calldata) {
                         setOpponentCalldataProofs(JSON.parse(_latestMessage.calldata));
                     } else if(_latestMessage?.message || _latestMessage?.move) {
-                        console.log("Setting the latest messages!");
+                        console.log("latest message received!");
+                        console.log(_latestMessage);
                         setLatestMessage(_latestMessage as Message);
-                    } else if(_latestMessage?.hit || _latestMessage?.moveProof) {
+                    } else if(_latestMessage?.hit && _latestMessage?.moveProof) {
                         console.log("move proofs received!");
-                        console.log({opponentMoveProofs});
-                        setOpponentMoveProofs([opponentMoveProofs, _latestMessage]);
+                        console.log(_latestMessage);
+                        setOpponentMoveProofs(prevMessages => [...(prevMessages || []), _latestMessage]);
                     }
                     setMessages(prevMessages => [...(prevMessages || []), _latestMessage]);
                 } else if(_latestMessage?.message === "ready" || _latestMessage?.message === "joined") {
@@ -156,7 +121,7 @@ const Container = (props: {
                         <h1 className="text-lg font-bold text-center">
                             Opponent Board
                         </h1>
-                        <OpponentBoard player={player} node={wakuNode} latestMessage={latestMessage} roomId={roomId} contentTopic={contentTopic}/>
+                        <OpponentBoard player={player} node={wakuNode} latestMessage={latestMessage} roomId={roomId} contentTopic={contentTopic} joinedOrCreated={joinedOrCreated} />
                     </div>
                 }
             </div>

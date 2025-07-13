@@ -17,10 +17,6 @@ export default function Home() {
     router.push('/room');
   };
 
-useEffect(() => {
-  console.log({loading});
-}, [loading]);
-
   return (
     <>
      <NavBar />
