@@ -1,7 +1,6 @@
 
 "use client"
 import React, { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import { Player, Message } from "../types";
 
 import { BOARD_SIZE, createBoard, Ship, SHIPS, ChatMessage, MoveReplyMessage, BoardProofMessage, BoardProofCalldataMessage } from "../utils/gameUtils";
@@ -28,14 +27,14 @@ function PlayerBoard(props: {
   localShips?: Ship[],
   contentTopic: string
 }) {
-  const {node, isLoading, player, latestMessage, roomId, joinedOrCreated, gameId, opponentProofs, localShips, opponentCalldataProofs, opponentMoveProofs, contentTopic} = props;
-  
-  if(!contentTopic) {
-    console.log("No content topic found!");
-    return;
-  }
-  
-  const encoder = createWakuEncoder(contentTopic);
+    const {node, isLoading, player, latestMessage, roomId, joinedOrCreated, gameId, opponentProofs, localShips, opponentCalldataProofs, opponentMoveProofs, contentTopic} = props;
+    
+    if(!contentTopic) {
+      console.log("No content topic found!");
+      return;
+    }
+    
+    const encoder = createWakuEncoder(contentTopic);
 
     const CURRENT_BOARD_INPUT_STATE = `board_${roomId}_input_state`;
     const [wasmBuffer, setWasmBuffer] = useState<Uint8Array|null>(null);
@@ -48,7 +47,6 @@ function PlayerBoard(props: {
     const [selectedShip, setSelectedShip] = useState<Ship | null>(null);
     const [shipPlacement, setShipPlacement] = useState<number[][]>([]);
     const [ships, setShips] = useState<Ship[]>(SHIPS);
-    const router = useRouter();
     const [isLoadingProof, setIsLoadingProof] = useState(false);
     const [txDetails, setTxDetails] = useState<any>(null);
     const [txError, setTxError] = useState<string|null>(null);

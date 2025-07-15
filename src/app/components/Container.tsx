@@ -14,6 +14,7 @@ import { useWallet } from "../store/useWallet";
 import { useWaku } from "@/app/WakuProvider";
 import { createWakuDecoder } from "@/app/WakuService";
 import { DecodedMessage } from "@waku/sdk";
+import { GameStateChannel } from "./helpers/GameStateChannel";
 
 const Container = (props: {
     player: Player,
@@ -43,6 +44,10 @@ const Container = (props: {
             setLocalShips(JSON.parse(_ships));
         }
     }, []);
+
+    const createGameState = () => {
+        const gameStateChannel = new GameStateChannel();
+    }
 
     const subscribeToMessages = async () => {
         if (!contentTopic) {

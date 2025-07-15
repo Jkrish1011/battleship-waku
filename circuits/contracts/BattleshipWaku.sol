@@ -228,38 +228,38 @@ contract BattleshipWaku is Initializable, OwnableUpgradeable, UUPSUpgradeable {
         return (games[gameId].player1, games[gameId].player2);
     }
 
-    function makeMove(uint256 gameId, MoveProof memory moveProof) external returns (bool) {
-        Game storage game = games[gameId];
-        require(game.isActive, "Game is not active");
-        require(game.playerTurn == msg.sender, "Not your turn");
+    // function makeMove(uint256 gameId, MoveProof memory moveProof) external returns (bool) {
+    //     Game storage game = games[gameId];
+    //     require(game.isActive, "Game is not active");
+    //     require(game.playerTurn == msg.sender, "Not your turn");
 
-        // Verify the move is valid using move_verification.circom
-        bool isMoveValid = moveVerifier.verifyProof(moveProof.pA, moveProof.pB, moveProof.pC, moveProof.pubSignals);
-        require(isMoveValid, "Move proof is invalid");
+    //     // Verify the move is valid using move_verification.circom
+    //     bool isMoveValid = moveVerifier.verifyProof(moveProof.pA, moveProof.pB, moveProof.pC, moveProof.pubSignals);
+    //     require(isMoveValid, "Move proof is invalid");
         
-        // Update the game state
-        if(moveProof.pubSignals[2] == 0x0000000000000000000000000000000000000000000000000000000000000001) {
-            game.player_hits[game.playerTurn]++;
-        }
-        game.playerTurn = game.playerTurn == game.player1 ? game.player2 : game.player1;
+    //     // Update the game state
+    //     if(moveProof.pubSignals[2] == 0x0000000000000000000000000000000000000000000000000000000000000001) {
+    //         game.player_hits[game.playerTurn]++;
+    //     }
+    //     game.playerTurn = game.playerTurn == game.player1 ? game.player2 : game.player1;
 
-        // Emit the move event
-        emit MoveMade(gameId, msg.sender);
-        return isMoveValid;
-    }
+    //     // Emit the move event
+    //     emit MoveMade(gameId, msg.sender);
+    //     return isMoveValid;
+    // }
 
     function winVerification(uint256 gameId, WinProof memory winProof) external returns (bool) {
         Game storage game = games[gameId];
         require(game.isActive, "Game is not active");
 
-        address winner;
-        if(game.player_hits[game.player1] == 12) {
-            winner = game.player1;
-        } else if(game.player_hits[game.player2] == 12) {
-            winner = game.player2;
-        } else {
-            revert("Game is not over");
-        }
+        // address winner;
+        // if(game.player_hits[game.player1] == 12) {
+        //     winner = game.player1;
+        // } else if(game.player_hits[game.player2] == 12) {
+        //     winner = game.player2;
+        // } else {
+        //     revert("Game is not over");
+        // }
 
         // Verify the move is valid using win_verification.circom
         bool isWinValid = winVerifier.verifyProof(winProof.pA, winProof.pB, winProof.pC, winProof.pubSignals);
@@ -279,7 +279,7 @@ contract BattleshipWaku is Initializable, OwnableUpgradeable, UUPSUpgradeable {
         }
 
         // Emit the game ended event
-        emit GameEnded(gameId, winner);
+        emit GameEnded(gameId, msg.sender);
 
         return isWinValid;
     }
