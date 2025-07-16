@@ -4,13 +4,15 @@ import React, { useState, useEffect } from "react";
 import { Player, Message } from "../types";
 
 import { BOARD_SIZE, createBoard, Ship, SHIPS, ChatMessage, MoveReplyMessage, BoardProofMessage, BoardProofCalldataMessage } from "../utils/gameUtils";
-import { BattleshipGameGenerator } from "./helpers/gameGenerator";
+// import { BattleshipGameGenerator } from "./helpers/GameGenerator";
+import { GameStateChannel } from "./helpers/GameStateChannel";
 import { getContract } from "../utils/gameUtils";
 import battleshipWakuAbi from "./../abi/BattleshipWaku.json" assert { type: "json" };
 import { useWallet } from "../store/useWallet";
 import Image from "next/image";
 import { toast } from "react-toastify";
 import { createWakuEncoder } from "@/app/WakuService";
+import { ethers } from "ethers";
 
 function PlayerBoard(props: { 
   latestMessage?: Message,
@@ -20,7 +22,7 @@ function PlayerBoard(props: {
   error: any,
   roomId: string,
   joinedOrCreated: string,
-  gameId?: string,
+  gameId: string,
   opponentProofs?: Message | null,
   opponentCalldataProofs?: Message | null,
   opponentMoveProofs?: any, // changed to array for tabbed UI
@@ -34,7 +36,7 @@ function PlayerBoard(props: {
       return;
     }
     
-    const encoder = createWakuEncoder(contentTopic);
+    const encoder = createWakuEncoder(contentTopic);    
 
     const CURRENT_BOARD_INPUT_STATE = `board_${roomId}_input_state`;
     const [wasmBuffer, setWasmBuffer] = useState<Uint8Array|null>(null);
@@ -42,7 +44,7 @@ function PlayerBoard(props: {
     const [isReadyToPlay, setIsReadyToPlay] = useState(false);
     const [zkeyBuffer, setZkeyBuffer] = useState<Uint8Array|null>(null);
     const [moveZkeyBuffer, setMoveZkeyBuffer] = useState<Uint8Array|null>(null);
-    const {address} = useWallet() as {address: string | null};
+    const {address, signer} = useWallet() as {address: string; signer: ethers.Signer};
     const [board, setBoard] = useState(createBoard());
     const [selectedShip, setSelectedShip] = useState<Ship | null>(null);
     const [shipPlacement, setShipPlacement] = useState<number[][]>([]);
@@ -60,6 +62,15 @@ function PlayerBoard(props: {
     const [shipsLocal, setShipsLocal] = useState<Ship[]>(localShips || []);
     const [games, setGames] = useState<any[]>([]);
     const [selectedOpponentProofTab, setSelectedOpponentProofTab] = useState(0);
+
+    const gameStateChannel = new GameStateChannel(gameId, roomId, signer);
+
+    useEffect(() => {
+      (async () => {
+        await gameStateChannel.initialize();
+      })();
+    }, []);
+
     // Reset tab when new proof(s) arrive
     useEffect(() => {
       if (opponentMoveProofs && Array.isArray(opponentMoveProofs) && opponentMoveProofs.length > 0) {
@@ -221,9 +232,8 @@ function PlayerBoard(props: {
     // const { push } = useLightPush({node, encoder});
 
     const verifyProofs = async () => {
-      const gameGenerator = new BattleshipGameGenerator();
-      await gameGenerator.initialize();
-      const isValid = await gameGenerator.verifyProof(verificationJson, proofPlayer);
+      
+      const isValid = await gameStateChannel.verifyProof(verificationJson, proofPlayer);
       console.log("isValid", isValid);
       if(isValid) {
         toast.success("Proof verified");
@@ -235,9 +245,7 @@ function PlayerBoard(props: {
 
     const verifyOpponentProofs = async () => {
       console.log("verifying opponent proofs")
-      const gameGenerator = new BattleshipGameGenerator();
-      await gameGenerator.initialize();
-      const isValid = await gameGenerator.verifyProof(verificationJson, proofOpponentPlayer);
+      const isValid = await gameStateChannel.verifyProof(verificationJson, proofOpponentPlayer);
       console.log("isValid", isValid);
       if(isValid) {
         toast.success("Proof verified");
@@ -249,8 +257,6 @@ function PlayerBoard(props: {
 
     const verifyOpponentMoveProofs = async () => {
       console.log("verifying opponent move proofs");
-      const gameGenerator = new BattleshipGameGenerator();
-      await gameGenerator.initialize();
       const proof = moveProofOpponentPlayer?.[selectedOpponentProofTab];
       if (!proof) return null;
       let proofData;
@@ -260,7 +266,7 @@ function PlayerBoard(props: {
         proofData = proof?.moveProof.proof;
       }
       console.log(proofData);
-      const isValid = await gameGenerator.verifyProof(moveVerificationJson, proofData);
+      const isValid = await gameStateChannel.verifyProof(moveVerificationJson, proofData);
       console.log("Move isValid", isValid);
       if(isValid) {
         toast.success("Move Proof verified");
@@ -291,8 +297,6 @@ function PlayerBoard(props: {
       await sendMessage(player, 'ready');
     }
 
-    
-
     const joinGame = async () => {
       if(!areAllShipsPlaced()) {
         alert('Please place all ships before joining game');
@@ -305,8 +309,6 @@ function PlayerBoard(props: {
       setTxDetails(null);
       setTxError(null);
       try{
-        const gameGenerator = new BattleshipGameGenerator();
-        await gameGenerator.initialize();
         const battleshipWaku = await getContract(process.env.NEXT_PUBLIC_BATTLESHIP_CONTRACT_ADDRESS as string, battleshipWakuAbi.abi);
         const userAddress = address;
         if(games.length > 0) {
@@ -325,7 +327,7 @@ function PlayerBoard(props: {
           if(joinedOrCreated === "created" && existingGameFound_Player1 === false) {
             let _gameId = gameId;
             if(!_gameId) {
-              _gameId = gameGenerator.randomBytesCrypto(32);
+              _gameId = gameStateChannel.randomBytesCrypto(32);
             } else {
               _gameId = gameId;
             }
@@ -361,11 +363,9 @@ function PlayerBoard(props: {
 
       setIsLoadingProof(true);
       try {
-        const gameGenerator = new BattleshipGameGenerator();
-        await gameGenerator.initialize();
-        const correctInput = await gameGenerator.generateCorrectInput(shipPlacement);
+        const correctInput = await gameStateChannel.generateCorrectInput(shipPlacement);
         localStorage.setItem(CURRENT_BOARD_INPUT_STATE, JSON.stringify(correctInput));
-        const {proof: _proofPlayer, calldata: _calldataPlayer} = await gameGenerator.generateProof(correctInput, wasmBuffer as Uint8Array, zkeyBuffer as Uint8Array);
+        const {proof: _proofPlayer, calldata: _calldataPlayer} = await gameStateChannel.generateProof(correctInput, wasmBuffer as Uint8Array, zkeyBuffer as Uint8Array);
         setProofPlayer(_proofPlayer);
         setCalldataPlayer(_calldataPlayer);
         // console.log({ships});
@@ -389,9 +389,7 @@ function PlayerBoard(props: {
       setIsLoadingProof(true);
 
       try {
-        const gameGenerator = new BattleshipGameGenerator();
         const boardState = JSON.parse(localStorage.getItem(CURRENT_BOARD_INPUT_STATE) as string);
-        await gameGenerator.initialize();
         const moveInput = {
           salt: boardState.salt,
           commitment: boardState.commitment,
@@ -401,7 +399,7 @@ function PlayerBoard(props: {
           guess_y: y,
           hit: hit
         };
-        const {proof: _proofPlayer, calldata: _calldataPlayer} = await gameGenerator.generateProof(moveInput, moveWasmBuffer as Uint8Array, moveZkeyBuffer as Uint8Array);
+        const {proof: _proofPlayer, calldata: _calldataPlayer} = await gameStateChannel.generateProof(moveInput, moveWasmBuffer as Uint8Array, moveZkeyBuffer as Uint8Array);
         
         return {proof: _proofPlayer, calldata: _calldataPlayer};
 

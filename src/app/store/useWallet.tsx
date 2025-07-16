@@ -1,9 +1,11 @@
 import { create } from "zustand";
+import { ethers } from "ethers";
 
 const useWallet = create((set, get) => ({
   address: null,
   isConnected: false,
   isInitialized: false,
+  signer: null,
   
   setAddress: (address: string) => set({ address: address }),
   
@@ -69,8 +71,36 @@ const useWallet = create((set, get) => ({
   disconnectWallet: () => {
     set({ 
       address: null, 
-      isConnected: false 
+      isConnected: false,
+      signer: null
     });
+  },
+
+  // Create wallet and store signer
+  createWallet: async () => {
+    const { ethereum } = window as any;
+    if (!ethereum) {
+      alert("Please install MetaMask!");
+      return;
+    }
+    try {
+      const provider = new ethers.BrowserProvider(ethereum);
+      const accounts = await ethereum.request({ method: "eth_requestAccounts" });
+      if (accounts.length > 0) {
+        const signer = await provider.getSigner();
+        set({
+          address: accounts[0],
+          isConnected: true,
+          signer: signer
+        });
+      }
+    } catch (error: any) {
+      console.error("Error creating wallet:", error);
+      if (error.code === 4001) {
+        // User rejected the connection
+        console.log("User rejected wallet connection");
+      }
+    }
   },
 
   // Initialize wallet listeners
@@ -118,18 +148,5 @@ const useWallet = create((set, get) => ({
     ethereum.removeAllListeners('disconnect');
   }
 }));
-
-// type BattleshipPeerIdState = {
-//   peerId: string | null;
-//   setPeerId: (peerId: string) => void;
-//   getPeerId: () => string | null;
-// };
-
-// const battleshipPeerId = create<BattleshipPeerIdState>((set, get) => ({
-//   peerId: null,
-//   setPeerId: (peerId: string) => set({ peerId }),
-//   getPeerId: () => get().peerId,
-// }));
-
 
 export { useWallet };
