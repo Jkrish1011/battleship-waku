@@ -1,13 +1,12 @@
-
 import { ethers } from 'ethers';
 import crypto from "crypto";
 
 import { buildPoseidon } from "circomlibjs";
 import * as snarkjs from "snarkjs";
 
-interface ShipPlacementCommitment {
-    commitment: string; // bytes 32
-}
+// interface ShipPlacementCommitment {
+//     commitment: string; // bytes 32
+// }
 
 interface ZKProofData {
     pi_a: string[];
@@ -44,6 +43,12 @@ interface Move {
     timestamp: number;
 }
 
+interface SignatureResponse {
+    message: string;
+    signature: string;
+    address: string;
+}
+
 interface GameState {
     gameId: string;
     wakuRoomId: string;
@@ -51,8 +56,8 @@ interface GameState {
     player2: string;
     isActive: boolean;
     playerTurn: string;
-    player1BoardCommitment: ShipPlacementCommitment | null;
-    player2BoardCommitment: ShipPlacementCommitment | null;
+    player1BoardCommitment: string | null;
+    player2BoardCommitment: string | null;
     player1MerkleRoot: string;
     player2MerkleRoot: string;
     player1ShipPlacementProof: ZKCalldataProof | null;
@@ -112,7 +117,7 @@ export class GameStateChannel {
     private levels: number;
     private shipSizes: number[];
 
-    constructor(gameId: string, wakuRoomId: string, signer?: ethers.Signer) {
+    constructor(gameId: string, wakuRoomId: string, signer: ethers.Signer) {
         this.gameState = {
             gameId: gameId,
             wakuRoomId: wakuRoomId,
@@ -137,7 +142,7 @@ export class GameStateChannel {
                 player2: null
             }
         };
-        this.signer = signer || null;
+        this.signer = signer;
         this.poseidon = null;
         this.levels = 7;
         this.shipSizes = [3, 3, 2, 2, 2];
@@ -195,7 +200,7 @@ export class GameStateChannel {
     static createShipPlacementCommitment(
         boardData: number[][],
         salt: string
-    ): ShipPlacementCommitment {
+    ): string {
         
         const flatBoard = boardData.flat();
 
@@ -203,19 +208,17 @@ export class GameStateChannel {
             ['uint8[100]', 'bytes32'], 
             [ flatBoard, ethers.keccak256(ethers.toUtf8Bytes(salt)) ]
         );
-        return {
-            commitment: commitment
-        }
+        return commitment;
     }
 
     // Helper method to verify commitment matches board data
     static verifyShipPlacementCommitment(
-        commitment: ShipPlacementCommitment,
+        commitment: string,
         boardData: number[][],
         salt: string
     ): boolean {
         const expectedCommitment = GameStateChannel.createShipPlacementCommitment(boardData, salt);
-        return commitment.commitment === expectedCommitment.commitment;
+        return commitment === expectedCommitment;
     }
 
     private computeStateHash(): string {
@@ -266,6 +269,20 @@ export class GameStateChannel {
         } else if(signerAddress === this.gameState.player2) {
             this.gameState.signatures.player2 = signature;
         }
+    }
+
+    // Helper method to convert BigInt to bytes32 (matching Solidity bytes32() conversion)
+    bigIntToBytes32(value: BigInt | string): string {
+        // Convert to BigInt if string
+        const bigIntValue = typeof value === 'string' ? BigInt(value) : value;
+        
+        // Convert to hex string and pad to 32 bytes (64 hex characters)
+        return ethers.zeroPadValue(ethers.toBeHex(bigIntValue), 32);
+    }
+
+    // Helper method to convert bytes32 back to BigInt
+    static bytes32ToBigInt(bytes32: string): BigInt {
+        return BigInt(bytes32);
     }
 
     private validateMoveProof(
@@ -393,6 +410,35 @@ export class GameStateChannel {
             }
         } finally {
             this.syncInProgress = false;
+        }
+    }
+
+    async signCustomMessage(message: string) : Promise<SignatureResponse> {
+        try{
+            if (!this.signer) {
+                throw new GameStateChannelError("Signer not available");
+            }
+    
+            const signature = await this.signer.signMessage(message);
+            const address = await this.signer.getAddress();
+    
+            return {
+                message,
+                signature,
+                address
+            };
+        }catch(err) {
+            console.error("Error signing message:", err);
+            throw err;
+        }
+    }
+
+    async verifyCustomMessage(message: SignatureResponse) : Promise<boolean> {
+        try{
+            const recoveredAddress = ethers.verifyMessage(message.message, message.signature);
+            return recoveredAddress.toLowerCase() === message.address.toLowerCase();
+        }catch(error){
+            return false;
         }
     }
 
@@ -818,7 +864,7 @@ export class GameStateChannel {
 
     async createGame(
         player1: string,
-        player1BoardCommitment: ShipPlacementCommitment,
+        player1BoardCommitment: string,
         player1MerkleRoot: string,
         player1ShipPlacementProof: ZKCalldataProof
     ): Promise<void> {
@@ -841,7 +887,7 @@ export class GameStateChannel {
 
     async joinGame(
         player2: string, 
-        player2BoardCommitment: ShipPlacementCommitment, 
+        player2BoardCommitment: string, 
         player2MerkleRoot: string,
         player2ShipPlacementProof: ZKCalldataProof
     ): Promise<void> {

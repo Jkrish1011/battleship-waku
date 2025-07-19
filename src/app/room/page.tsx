@@ -70,7 +70,7 @@ const Page = () => {
 
     return(
       <>
-      <Navbar />
+        <Navbar />
         <div className="flex flex-col items-center justify-center min-h-screen space-y-4">
           <div className="flex flex-col items-center">
             <input

@@ -1,5 +1,3 @@
-// @ts-nocheck
-
 'use client'
 
 import React, { useState, useEffect } from "react";
@@ -9,12 +7,9 @@ import { Player, Message } from "../types";
 import OpponentBoard from "./OpponentBoard";
 import { decodeMessage, isGameReady , Ship} from "../utils/gameUtils";
 import Spinner from "./Spinner";
-import { findLatestMessage } from "../utils";
-import { useWallet } from "../store/useWallet";
 import { useWaku } from "@/app/WakuProvider";
 import { createWakuDecoder } from "@/app/WakuService";
 import { DecodedMessage } from "@waku/sdk";
-import { GameStateChannel } from "./helpers/GameStateChannel";
 
 const Container = (props: {
     player: Player,
@@ -25,12 +20,12 @@ const Container = (props: {
 }) => {
 
     const {player, roomId, joinedOrCreated, gameId, contentTopic} = props;
-    const {address} = useWallet() as {address: string | null};
     const [messages, setMessages] = useState<Message[]>();
-    const [latestMessage, setLatestMessage] = useState<Message>(null);
-    const [opponentProofs, setOpponentProofs] = useState<Message>(null);
-    const [opponentCalldataProofs, setOpponentCalldataProofs] = useState<Message>(null);
+    const [latestMessage, setLatestMessage] = useState<Message>({} as Message);
+    const [opponentProofs, setOpponentProofs] = useState<Message>({} as Message);
+    const [opponentCalldataProofs, setOpponentCalldataProofs] = useState<Message>({} as Message);
     const [opponentMoveProofs, setOpponentMoveProofs] = useState<Message[]>([]);
+    const [opponentSignature, setOpponentSignature] = useState<Message>({} as Message);
     const [localShips, setLocalShips] = useState<Ship[]>();
     // This provides the node which we will use for the communication.
     const { wakuNode, peerId, loading, error } = useWaku();
@@ -45,10 +40,6 @@ const Container = (props: {
         }
     }, []);
 
-    const createGameState = () => {
-        const gameStateChannel = new GameStateChannel();
-    }
-
     const subscribeToMessages = async () => {
         if (!contentTopic) {
             console.log("No content topic found!");
@@ -60,7 +51,6 @@ const Container = (props: {
             const decodedMessage = decodeMessage(wakuMessage);
             
             if (decodedMessage) {    
-                
                 const _latestMessage = decodedMessage;
                 // If the latest message is not from the sender itself, do not process. Only process from the opponent.
                 if(_latestMessage?.sender.toString().toLowerCase() !== player.toString().toLowerCase() ) {
@@ -76,6 +66,11 @@ const Container = (props: {
                         console.log("move proofs received!");
                         console.log(_latestMessage);
                         setOpponentMoveProofs(prevMessages => [...(prevMessages || []), _latestMessage]);
+                    }
+                    else if(_latestMessage?.signature) {
+                        console.log("signature received!");
+                        console.log(_latestMessage);
+                        setOpponentSignature(_latestMessage);
                     }
                     setMessages(prevMessages => [...(prevMessages || []), _latestMessage]);
                 } else if(_latestMessage?.message === "ready" || _latestMessage?.message === "joined") {
@@ -110,12 +105,13 @@ const Container = (props: {
                     error={error}
                     roomId={roomId || ''}
                     joinedOrCreated={joinedOrCreated}
-                    gameId={gameId}
+                    gameId={gameId || ''}
                     opponentProofs={opponentProofs}
                     opponentCalldataProofs={opponentCalldataProofs}
                     opponentMoveProofs={opponentMoveProofs}
                     localShips={localShips}
                     contentTopic={contentTopic}
+                    opponentSignature={opponentSignature}
                 />
 
                 {
