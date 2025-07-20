@@ -117,9 +117,9 @@ export class GameStateChannel {
     private levels: number;
     private shipSizes: number[];
 
-    constructor(gameId: string, wakuRoomId: string, signer: ethers.Signer) {
+    constructor(wakuRoomId: string, signer: ethers.Signer) {
         this.gameState = {
-            gameId: gameId,
+            gameId: "",
             wakuRoomId: wakuRoomId,
             player1: "",
             player2: "",
@@ -251,8 +251,21 @@ export class GameStateChannel {
             this.hashMoves(),
             this.gameState.winner || ethers.ZeroAddress
         ];
+        console.log("values", values);
 
         return ethers.solidityPackedKeccak256(types, values);
+    }
+
+    async updateSignatures(signerAddress: string, signature: string) {
+        if (!this.signer || !this.gameState) {
+            return;
+        }
+        
+        if(signerAddress === this.gameState.player1) {
+            this.gameState.signatures.player1 = signature;
+        } else if(signerAddress === this.gameState.player2) {
+            this.gameState.signatures.player2 = signature;
+        }
     }
 
     private async signGameState(): Promise<void> {
@@ -863,6 +876,7 @@ export class GameStateChannel {
     }
 
     async createGame(
+        gameId: string,
         player1: string,
         player1BoardCommitment: string,
         player1MerkleRoot: string,
@@ -872,6 +886,7 @@ export class GameStateChannel {
         if (!this.gameState) {
             throw new GameStateChannelError("Game state not initialized");
         }
+        this.gameState.gameId = gameId;
         this.gameState.player1 = player1;
         this.gameState.isActive = false;
         this.gameState.playerTurn = player1;
