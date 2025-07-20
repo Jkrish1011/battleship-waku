@@ -1,4 +1,4 @@
-// @ts-nocheck
+
 import { Message, Player } from "../types";
 import protobuf from "protobufjs";
 import { ethers } from "ethers";
@@ -83,44 +83,67 @@ const BoardProofCalldataMessage = new protobuf.Type("BoardProofCalldataMessage")
   .add(new protobuf.Field("calldata", 8, "string"))
   .add(new protobuf.Field("id", 4, "string"));
 
+const SignatureMessage = new protobuf.Type("SignatureMessage")
+  .add(new protobuf.Field("timestamp", 1, "uint64"))
+  .add(new protobuf.Field("sender", 2, "string"))
+  .add(new protobuf.Field("signature", 10, "string"))
+  .add(new protobuf.Field("id", 4, "string"));
+
 const decodeMessage = (wakuMessage: any) => {
   if (!wakuMessage.payload) {
     console.log("No payload found!");
     return {};
   }
   try {
-    const { timestamp, sender, message, id } = ChatMessage.decode(
+    var { timestamp, sender, message, id } = ChatMessage.decode(
       wakuMessage.payload
     );
+
     if (message) {
       return { timestamp, sender, message, id };
-    } else {
-      const { timestamp, sender, move, id } = MoveMessage.decode(
-        wakuMessage.payload
-      );
-      if (move) {
-        return { timestamp, sender, move, id };
-      } else {
-        const { timestamp, sender, hit, moveProof, id } = MoveReplyMessage.decode(
-          wakuMessage.payload
-        );
-        if(hit) {
-          return { timestamp, sender, hit, moveProof, id };
-        } else{
-          var { timestamp, sender, proof, id } = BoardProofMessage.decode(
-            wakuMessage.payload
-          );
-          if(proof) {
-            return { timestamp, sender, proof, id };
-          } else {
-            var { timestamp, sender, calldata, id } = BoardProofCalldataMessage.decode(
-              wakuMessage.payload
-            );
-            return { timestamp, sender, calldata, id };
-          }
-        }
-      }
     }
+
+    var { timestamp, sender, calldata, id } = BoardProofCalldataMessage.decode(
+      wakuMessage.payload
+    )
+
+    if(calldata) {
+      return { timestamp, sender, calldata, id };
+    }
+    
+    var { timestamp, sender, proof, id } = BoardProofMessage.decode(
+      wakuMessage.payload
+    );
+
+    if(proof) {
+      return { timestamp, sender, proof, id };
+    }
+
+    var { timestamp, sender, hit, moveProof, id } = MoveReplyMessage.decode(
+      wakuMessage.payload
+    );
+
+    if(hit) {
+      return { timestamp, sender, hit, moveProof, id };
+    }
+
+    var { timestamp, sender, move, id } = MoveMessage.decode(
+      wakuMessage.payload
+    );
+
+    if (move) {
+      return { timestamp, sender, move, id };
+    }
+    
+    var { timestamp, sender, signature, id } = SignatureMessage.decode(
+      wakuMessage.payload
+    );
+    
+    if(signature) {
+      return { timestamp, sender, signature, id };
+    }
+
+    return {};
   } catch (err) {
     console.error(err);
   }
@@ -180,6 +203,7 @@ export {
   MoveReplyMessage,
   BoardProofMessage,
   BoardProofCalldataMessage,
+  SignatureMessage,
   decodeMessage,
   getContract,
   shorten,

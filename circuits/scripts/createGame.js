@@ -1,7 +1,7 @@
 const { ethers, upgrades } = require("ethers");
 require('dotenv').config();
 const battleshipWakuAbi = require("./../artifacts/contracts/BattleshipWaku.sol/BattleshipWaku.json");
-const { BattleshipGameGenerator } = require("./../test/helpers/gameGenerator");
+const { BattleshipGameGenerator } = require("../test/helpers/GameGenerator");
 
 const getContract = async (CONTRACT_ADDRESS, CONTRACT_ABI, RPC_URL) => {
     try {

@@ -1,17 +1,19 @@
 
 "use client"
 import React, { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import { Player, Message } from "../types";
 
-import { BOARD_SIZE, createBoard, Ship, SHIPS, ChatMessage, MoveReplyMessage, BoardProofMessage, BoardProofCalldataMessage } from "../utils/gameUtils";
-import { BattleshipGameGenerator } from "./helpers/gameGenerator";
+import { BOARD_SIZE, createBoard, Ship, SHIPS, ChatMessage, MoveReplyMessage, BoardProofMessage, BoardProofCalldataMessage, SignatureMessage } from "../utils/gameUtils";
+// import { BattleshipGameGenerator } from "./helpers/GameGenerator";
+import { GameStateChannel } from "./helpers/GameStateChannel";
 import { getContract } from "../utils/gameUtils";
 import battleshipWakuAbi from "./../abi/BattleshipWaku.json" assert { type: "json" };
 import { useWallet } from "../store/useWallet";
 import Image from "next/image";
 import { toast } from "react-toastify";
 import { createWakuEncoder } from "@/app/WakuService";
+import { ethers } from "ethers";
+
 
 function PlayerBoard(props: { 
   latestMessage?: Message,
@@ -21,21 +23,22 @@ function PlayerBoard(props: {
   error: any,
   roomId: string,
   joinedOrCreated: string,
-  gameId?: string,
+  gameId: string,
   opponentProofs?: Message | null,
   opponentCalldataProofs?: Message | null,
   opponentMoveProofs?: any, // changed to array for tabbed UI
   localShips?: Ship[],
-  contentTopic: string
+  contentTopic: string,
+  opponentSignature?: Message | null,
 }) {
-  const {node, isLoading, player, latestMessage, roomId, joinedOrCreated, gameId, opponentProofs, localShips, opponentCalldataProofs, opponentMoveProofs, contentTopic} = props;
-  
-  if(!contentTopic) {
-    console.log("No content topic found!");
-    return;
-  }
-  
-  const encoder = createWakuEncoder(contentTopic);
+    const {node, isLoading, player, latestMessage, roomId, joinedOrCreated, gameId, opponentProofs, localShips, opponentCalldataProofs, opponentMoveProofs, contentTopic, opponentSignature} = props;
+    
+    if(!contentTopic) {
+      console.log("No content topic found!");
+      return;
+    }
+    
+    const encoder = createWakuEncoder(contentTopic);    
 
     const CURRENT_BOARD_INPUT_STATE = `board_${roomId}_input_state`;
     const [wasmBuffer, setWasmBuffer] = useState<Uint8Array|null>(null);
@@ -43,12 +46,10 @@ function PlayerBoard(props: {
     const [isReadyToPlay, setIsReadyToPlay] = useState(false);
     const [zkeyBuffer, setZkeyBuffer] = useState<Uint8Array|null>(null);
     const [moveZkeyBuffer, setMoveZkeyBuffer] = useState<Uint8Array|null>(null);
-    const {address} = useWallet() as {address: string | null};
     const [board, setBoard] = useState(createBoard());
     const [selectedShip, setSelectedShip] = useState<Ship | null>(null);
     const [shipPlacement, setShipPlacement] = useState<number[][]>([]);
     const [ships, setShips] = useState<Ship[]>(SHIPS);
-    const router = useRouter();
     const [isLoadingProof, setIsLoadingProof] = useState(false);
     const [txDetails, setTxDetails] = useState<any>(null);
     const [txError, setTxError] = useState<string|null>(null);
@@ -61,7 +62,80 @@ function PlayerBoard(props: {
     const [moveVerificationJson, setMoveVerificationJson] = useState<string|null>(null);
     const [shipsLocal, setShipsLocal] = useState<Ship[]>(localShips || []);
     const [games, setGames] = useState<any[]>([]);
+    const [isWalletInitialized, setIsWalletInitialized] = useState(false);
     const [selectedOpponentProofTab, setSelectedOpponentProofTab] = useState(0);
+    const [gameStateChannel, setGameStateChannel] = useState<GameStateChannel | null>(null);
+    const [gameStateData, setGameStateData] = useState<any>(null);
+    const {address, getSigner, checkWalletConnection, initializeWalletListeners, cleanupWalletListeners } = useWallet() as {
+      address: string; 
+      getSigner: () => Promise<ethers.Signer | null>;
+      checkWalletConnection: () => Promise<void>;
+      initializeWalletListeners: () => void;
+      cleanupWalletListeners: () => void;
+    };
+
+    useEffect(() => {
+      console.log("initializing wallet listeners")
+        // Initialize wallet connection check and listeners
+        checkWalletConnection();
+        initializeWalletListeners();
+        setIsWalletInitialized(true);
+
+        // Cleanup listeners on unmount
+        return () => {
+            cleanupWalletListeners();
+        };
+    }, []);
+    
+    useEffect(() => {
+      const initializeGameStateChannel = async () => {
+        console.log("Initalizing game state channel");
+        const signer = await getSigner();
+        
+        if (signer) {
+          console.log("gameId", gameId);
+          console.log("roomId", roomId);
+          const channel = new GameStateChannel(roomId, signer);
+          setGameStateChannel(channel);
+          // Initialize gameStateData
+          setGameStateData(channel.getGameState());
+        }
+      };
+      
+      initializeGameStateChannel();
+    }, [isWalletInitialized, roomId, getSigner]);
+
+    // Update gameStateData whenever gameStateChannel changes
+    useEffect(() => {
+      if (gameStateChannel) {
+        setGameStateData(gameStateChannel.getGameState());
+      }
+    }, [gameStateChannel]);
+
+    // Helper function to refresh game state data
+    const refreshGameState = () => {
+      if (gameStateChannel) {
+        setGameStateData(gameStateChannel.getGameState());
+      }
+    };
+
+    useEffect(() => {
+      if(Object.keys(opponentSignature).length > 0 && gameStateChannel) {
+        console.log("opponent signature received!");
+        console.log(opponentSignature);
+        const _opponentSignature = JSON.parse(opponentSignature?.signature || "");
+        (async () => {
+          const isValid = await gameStateChannel.verifyCustomMessage(_opponentSignature);
+          console.log("isValid", isValid);
+          if(isValid) {
+            toast.success("Signature verified");
+          } else {
+            toast.error("Signature verification failed");
+          }
+        })()
+      }
+    }, [opponentSignature, gameStateChannel]);
+
     // Reset tab when new proof(s) arrive
     useEffect(() => {
       if (opponentMoveProofs && Array.isArray(opponentMoveProofs) && opponentMoveProofs.length > 0) {
@@ -178,9 +252,7 @@ function PlayerBoard(props: {
     }, [localShips]);
 
     useEffect(() => {
-      console.log("New Opponent calldata proofs received! inside PlayerBoard");
-      console.log(opponentCalldataProofs);
-      if (opponentCalldataProofs) {
+      if (Object.keys(opponentCalldataProofs).length > 0) {
         setCalldataProofOpponentPlayer(opponentCalldataProofs);
       }
     }, [opponentCalldataProofs]);
@@ -204,7 +276,6 @@ function PlayerBoard(props: {
                       player2_board_commitment: game[7],
                       player2_merkle_root: game[8],
                       wakuRoomId: game[11],
-                      // Add the rest of the fields based on your GameView struct
                   };
               }
               return game;
@@ -215,17 +286,28 @@ function PlayerBoard(props: {
     }, []);
 
     useEffect(() => {
-      if (!isLoading) {
+      console.log("isLoading", isLoading)
+      if (!isLoading && gameStateChannel) {
         sendMessage(player, 'joined');
+        (async() => {
+          await gameStateChannel.initialize();
+          const signature = await gameStateChannel.signCustomMessage('joined');
+          refreshGameState(); // Update UI after signature update
+          sendSignatureMessage(player, JSON.stringify(signature));
+        })();
       }
-    }, [isLoading]);
+    }, [isWalletInitialized, isLoading, gameStateChannel]);
 
     // const { push } = useLightPush({node, encoder});
 
     const verifyProofs = async () => {
-      const gameGenerator = new BattleshipGameGenerator();
-      await gameGenerator.initialize();
-      const isValid = await gameGenerator.verifyProof(verificationJson, proofPlayer);
+      if (!gameStateChannel) {
+        toast.error("Game state channel not initialized");
+        return false;
+      }
+      console.log({proofPlayer});
+      console.log({calldataPlayer});
+      const isValid = await gameStateChannel.verifyProof(verificationJson, proofPlayer);
       console.log("isValid", isValid);
       if(isValid) {
         toast.success("Proof verified");
@@ -236,10 +318,12 @@ function PlayerBoard(props: {
     }
 
     const verifyOpponentProofs = async () => {
+      if (!gameStateChannel) {
+        toast.error("Game state channel not initialized");
+        return false;
+      }
       console.log("verifying opponent proofs")
-      const gameGenerator = new BattleshipGameGenerator();
-      await gameGenerator.initialize();
-      const isValid = await gameGenerator.verifyProof(verificationJson, proofOpponentPlayer);
+      const isValid = await gameStateChannel.verifyProof(verificationJson, proofOpponentPlayer);
       console.log("isValid", isValid);
       if(isValid) {
         toast.success("Proof verified");
@@ -250,9 +334,11 @@ function PlayerBoard(props: {
     }
 
     const verifyOpponentMoveProofs = async () => {
+      if (!gameStateChannel) {
+        toast.error("Game state channel not initialized");
+        return false;
+      }
       console.log("verifying opponent move proofs");
-      const gameGenerator = new BattleshipGameGenerator();
-      await gameGenerator.initialize();
       const proof = moveProofOpponentPlayer?.[selectedOpponentProofTab];
       if (!proof) return null;
       let proofData;
@@ -262,7 +348,7 @@ function PlayerBoard(props: {
         proofData = proof?.moveProof.proof;
       }
       console.log(proofData);
-      const isValid = await gameGenerator.verifyProof(moveVerificationJson, proofData);
+      const isValid = await gameStateChannel.verifyProof(moveVerificationJson, proofData);
       console.log("Move isValid", isValid);
       if(isValid) {
         toast.success("Move Proof verified");
@@ -293,8 +379,6 @@ function PlayerBoard(props: {
       await sendMessage(player, 'ready');
     }
 
-    
-
     const joinGame = async () => {
       if(!areAllShipsPlaced()) {
         alert('Please place all ships before joining game');
@@ -307,8 +391,6 @@ function PlayerBoard(props: {
       setTxDetails(null);
       setTxError(null);
       try{
-        const gameGenerator = new BattleshipGameGenerator();
-        await gameGenerator.initialize();
         const battleshipWaku = await getContract(process.env.NEXT_PUBLIC_BATTLESHIP_CONTRACT_ADDRESS as string, battleshipWakuAbi.abi);
         const userAddress = address;
         if(games.length > 0) {
@@ -327,18 +409,24 @@ function PlayerBoard(props: {
           if(joinedOrCreated === "created" && existingGameFound_Player1 === false) {
             let _gameId = gameId;
             if(!_gameId) {
-              _gameId = gameGenerator.randomBytesCrypto(32);
+              _gameId = gameStateChannel?.randomBytesCrypto(32);
             } else {
               _gameId = gameId;
             }
             tx = await battleshipWaku.createGame(userAddress, calldataPlayer, _gameId, roomId, {
               gasLimit: 5000000
             });
+            // State Channel Game creation.
+            await gameStateChannel?.createGame(_gameId, address, gameStateChannel?.bigIntToBytes32(calldataPlayer[3][0]), gameStateChannel?.bigIntToBytes32(calldataPlayer[3][1]), calldataPlayer);
+            localStorage.setItem(`ships_${roomId}_GameState`, JSON.stringify(gameStateChannel?.getGameState()));
           } else if(joinedOrCreated === "joined" && existingGameFound_Player2 === false){
             console.log("joining game");
             tx = await battleshipWaku.JoinGame(userAddress, calldataPlayer, gameId, {
               gasLimit: 5000000
             });
+            // State Channel Game joining.
+            await gameStateChannel?.joinGame(userAddress, gameStateChannel?.bigIntToBytes32(calldataPlayer[3][0]), gameStateChannel?.bigIntToBytes32(calldataPlayer[3][1]), calldataPlayer);
+            localStorage.setItem(`ships_${roomId}_GameState`, JSON.stringify(gameStateChannel?.getGameState()));
           } 
         }
         
@@ -363,17 +451,16 @@ function PlayerBoard(props: {
 
       setIsLoadingProof(true);
       try {
-        const gameGenerator = new BattleshipGameGenerator();
-        await gameGenerator.initialize();
-        const correctInput = await gameGenerator.generateCorrectInput(shipPlacement);
+        const correctInput = await gameStateChannel?.generateCorrectInput(shipPlacement);
         localStorage.setItem(CURRENT_BOARD_INPUT_STATE, JSON.stringify(correctInput));
-        const {proof: _proofPlayer, calldata: _calldataPlayer} = await gameGenerator.generateProof(correctInput, wasmBuffer as Uint8Array, zkeyBuffer as Uint8Array);
+        const {proof: _proofPlayer, calldata: _calldataPlayer} = await gameStateChannel?.generateProof(correctInput, wasmBuffer as Uint8Array, zkeyBuffer as Uint8Array);
         setProofPlayer(_proofPlayer);
         setCalldataPlayer(_calldataPlayer);
         // console.log({ships});
 
         // localStorage.setItem(`ships_${roomId}`, JSON.stringify(ships.map(item => ({...item, placed: false}))));
         localStorage.setItem(`ships_${roomId}`, JSON.stringify(ships));
+        refreshGameState(); // Update UI after creating game
       } catch (error: any) {
         setTxError(error?.message || 'Proof generation or transaction error');
         console.error('Proof generation error:', error);
@@ -391,9 +478,7 @@ function PlayerBoard(props: {
       setIsLoadingProof(true);
 
       try {
-        const gameGenerator = new BattleshipGameGenerator();
         const boardState = JSON.parse(localStorage.getItem(CURRENT_BOARD_INPUT_STATE) as string);
-        await gameGenerator.initialize();
         const moveInput = {
           salt: boardState.salt,
           commitment: boardState.commitment,
@@ -403,7 +488,7 @@ function PlayerBoard(props: {
           guess_y: y,
           hit: hit
         };
-        const {proof: _proofPlayer, calldata: _calldataPlayer} = await gameGenerator.generateProof(moveInput, moveWasmBuffer as Uint8Array, moveZkeyBuffer as Uint8Array);
+        const {proof: _proofPlayer, calldata: _calldataPlayer} = await gameStateChannel.generateProof(moveInput, moveWasmBuffer as Uint8Array, moveZkeyBuffer as Uint8Array);
         
         return {proof: _proofPlayer, calldata: _calldataPlayer};
 
@@ -603,6 +688,44 @@ function PlayerBoard(props: {
         }
     }
 
+    const sendSignatureMessage = async (sender: string, signature: string) => {
+      /*
+        1/ Create a message
+        2/ Serialize the message
+        3/ Use push functionality to send the message
+      */
+        console.log("Sending message...");
+        // 1/ create message
+        const newMessage = SignatureMessage.create({
+          timestamp: Date.now(),
+          signature,
+          sender,
+          id: crypto.randomUUID()
+        });
+
+        // 2/ Serialize message
+        const serializedMessage = SignatureMessage.encode(newMessage).finish();
+
+        // 3/ Push Message
+        // if (push) {
+        //   const pushRes = await push({
+        //     timestamp: new Date(),
+        //     payload: serializedMessage
+        //   }); 
+        // }
+
+        const result = await node.lightPush.send(encoder, {
+          payload: serializedMessage,
+          timestamp: new Date(),
+        }, { autoRetry: true });
+
+        if (result.successes.length > 0) {
+          console.log(`message sent successfully.`);
+        } else {
+          console.warn(`Failed to send message:`, result.failures);
+        }
+    }
+
     // This is the function which will sent the proofs between the players in real time.
     const sendBoardProofMessage = async (proof: string) => {
     
@@ -723,6 +846,16 @@ function PlayerBoard(props: {
       }
     }
 
+    const requestGameState = () => {
+      try{
+        
+      }catch(error) {
+        console.error(error);
+      }finally{
+
+      }
+    }
+
     return (
       <>
       <div className="relative">
@@ -828,7 +961,7 @@ function PlayerBoard(props: {
           </div>
         </div>
         )}
-        {calldataProofOpponentPlayer && (
+        {Object.keys(calldataProofOpponentPlayer).length > 0 && (
         <div id="proof-container" className="mt-8 p-4 bg-gray-50 rounded-lg border border-gray-200">
           <div className="space-y-4">
             <h3 className="font-bold mb-2">Opponent Board Proof</h3>
@@ -916,6 +1049,16 @@ function PlayerBoard(props: {
           ) : (
             <div className="text-gray-500">No transaction yet.</div>
           )}
+        </div>
+
+         {/* State Channel Details */}
+         <div className="mt-6 p-4 bg-gray-100 rounded shadow">
+          <h3 className="font-bold mb-2">State Channel Details</h3>
+          <label className="block text-sm font-medium text-gray-700 mb-1">State Channel</label>
+            <textarea id="proof" className="w-full h-40 p-3 bg-gray-100 rounded font-mono text-sm resize-y" 
+            readOnly
+            value={JSON.stringify(gameStateData, null, 2)}
+            />
         </div>
       </div>
       </>

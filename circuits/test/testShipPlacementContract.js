@@ -6,7 +6,7 @@ const {
 } = require("@nomicfoundation/hardhat-toolbox/network-helpers");
 // const { deployProxy } = require("@openzeppelin/hardhat-upgrades");
 
-const { BattleshipGameGenerator } = require("./helpers/gameGenerator");
+const { BattleshipGameGenerator } = require("./helpers/GameGenerator");
 const fs = require("fs");
 const path = require("path");
 
@@ -36,7 +36,7 @@ describe("BattleshipWakuGame", function () {
     // const BattleshipWaku = await hre.ethers.getContractFactory("BattleshipWaku");
     // const battleshipWaku = await deployProxy(BattleshipWaku, [shipPlacementVerifier.target, moveVerifier.target, winVerifier.target],{ initializer: "initialize" });
     // console.log("BattleshipWaku", battleshipWaku.target);
-    const BattleshipWaku = await hre.ethers.getContractFactory("BattleshipWaku");
+    const BattleshipWaku = await hre.ethers.getContractFactory("BattleshipWakuOLD");
     const battleshipWaku = await hre.upgrades.deployProxy(BattleshipWaku, [shipPlacementVerifier.target, moveVerifier.target, winVerifier.target],{ initializer: "initialize", kind: "uups" });
     console.log("BattleshipWaku", battleshipWaku.target);
 
