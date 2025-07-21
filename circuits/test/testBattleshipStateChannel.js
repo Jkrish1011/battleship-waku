@@ -8,6 +8,7 @@ const {
 const { BattleshipGameGenerator } = require("./helpers/GameGenerator");
 const fs = require("fs");
 const path = require("path");
+const verificationKeyJson = require("../keys/ship_verification_key.json");
 
 describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
   // Increase timeout for zk proof generation
@@ -110,100 +111,165 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
     });
   });
 
-//   describe("Initial State Submission with Real Ship Placements", function () {
-//     it("Should allow both players to submit valid initial states", async function () {
-//       const { battleshipWaku, player1, player2, gameGenerator } = await loadFixture(deployBattleshipFixture);
+  describe("Initial State Submission with Real Ship Placements", function () {
+    it("Should allow both players to submit valid initial states", async function () {
+        const { battleshipWaku, player1, player2, gameGenerator,shipPlacementVerifier } = await loadFixture(deployBattleshipFixture);
 
-//       // Open channel
-//       await battleshipWaku.connect(player1).openChannel(player2.address);
+        // Open channel
+        await battleshipWaku.connect(player1).openChannel(player2.address);
+        let shipPlacementPositionsPlayer1 = null, shipPlacementPositionsPlayer2 = null, shipPositions1 = null, shipPositions2 = null;
+        while (true) {
+            shipPositions1 = gameGenerator.generateRandomShipPositions();
+            shipPlacementPositionsPlayer1 = await gameGenerator.generateShipPlacementPositions(shipPositions1);
+            const isValid = gameGenerator.validateInput(shipPlacementPositionsPlayer1.ships, shipPlacementPositionsPlayer1.board_state)
+            console.log("isValid", isValid);
+            if (isValid) {
+                break;
+            }
+        }
+        console.log("shipPlacementPositionsPlayer1: ", shipPlacementPositionsPlayer1);
+        while (true) {
+            shipPositions2 = gameGenerator.generateRandomShipPositions();
+            shipPlacementPositionsPlayer2 = await gameGenerator.generateShipPlacementPositions(shipPositions2);
+            if (gameGenerator.validateInput(shipPlacementPositionsPlayer2.ships, shipPlacementPositionsPlayer2.board_state)) {
+                break;
+            }
+        }
+        console.log("shipPlacementPositionsPlayer2:", shipPlacementPositionsPlayer2);
+
+        const wasmPath = path.join(__dirname, "..", "build", "ship_placement", "ship_placement_js", "ship_placement.wasm");
+        const zkeyPath = path.join(__dirname, "..", "keys", "ship_placement_final.zkey");
+        const verificationKeyPath = path.join(__dirname, "..", "keys", "ship_verification_key.json");
+        if (!fs.existsSync(wasmPath)) {
+            throw new Error(`WASM file not found at: ${wasmPath}`);
+        }
+        
+        if (!fs.existsSync(zkeyPath)) {
+            throw new Error(`zkey file not found at: ${zkeyPath}`);
+        }
+        if (!fs.existsSync(verificationKeyPath)) {
+            throw new Error(`verification file not found at: ${verificationKeyPath}`);
+        }
+        console.log("wasmPath", wasmPath);
+        console.log("zkeyPath", zkeyPath);
+        console.log("verificationKeyPath", verificationKeyPath);
+
+        const verification = fs.readFileSync(verificationKeyPath);
+        // const wasmBuffer = fs.readFileSync(wasmPath);
+        // const zkeyBuffer = fs.readFileSync(zkeyPath);
+        // console.log("WASM buffer size:", wasmBuffer.length);
+        // console.log("zkey buffer size:", zkeyBuffer.length);
+        console.log("--");
+
+        const {proof, calldata} = await gameGenerator.generateProof(shipPlacementPositionsPlayer1, wasmPath, zkeyPath);
+        // console.log(proofPlayer1);
+        const proofPlayer1_converted = {
+            pA: calldata[0],
+            pB: calldata[1],
+            pC: calldata[2],
+            pubSignals: calldata[3]
+        };
+        
+        console.log("proofPlayer1", calldata);
+        let offchainVerification = await gameGenerator.verifyProof(verificationKeyJson, proof);
+        console.log("Offchain verification proof", offchainVerification);
+        
+        let result = await shipPlacementVerifier.verifyProof(proofPlayer1_converted.pA, proofPlayer1_converted.pB, proofPlayer1_converted.pC, proofPlayer1_converted.pubSignals);
+        console.log("result", result);
+
+        const {proof: _proofPlayer2, calldata: proofPlayer2} = await gameGenerator.generateProof(shipPlacementPositionsPlayer2, wasmPath, zkeyPath);
+        const proofPlayer2_converted = {
+          pA: proofPlayer2[0],
+          pB: proofPlayer2[1],
+          pC: proofPlayer2[2],
+          pubSignals: proofPlayer2[3]
+        };
+        let result2 = await shipPlacementVerifier.verifyProof(proofPlayer2_converted.pA, proofPlayer2_converted.pB, proofPlayer2_converted.pC, proofPlayer2_converted.pubSignals);
+        console.log("result2", result2);
+
+        // // Create initial states with real commitments
+        // const initialState1 = createGameState({
+        // currentTurn: player1.address,
+        // player1ShipCommitment: hre.ethers.keccak256(hre.ethers.toUtf8Bytes(player1ShipProof.commitment))
+        // });
+        // const initialState2 = createGameState({
+        // currentTurn: player1.address,
+        // player2ShipCommitment: hre.ethers.keccak256(hre.ethers.toUtf8Bytes(player2ShipProof.commitment))
+        // });
+
+        // const signature1 = await signGameState(initialState1, player1);
+        // const signature2 = await signGameState(initialState2, player2);
+
+        // // Both players submit initial states
+        // await expect(battleshipWaku.connect(player1).submitInitialState(1, initialState1, signature1, player1ShipProof))
+        // .to.emit(battleshipWaku, "InitialStateSubmitted")
+        // .withArgs(1, player1.address, hre.ethers.keccak256(hre.ethers.AbiCoder.defaultAbiCoder().encode(
+        //     ["tuple(bytes32,uint256,address,uint256,bytes32,bytes32,uint8,uint8,bool,address,uint256)"],
+        //     [[
+        //     initialState1.stateHash,
+        //     initialState1.nonce,
+        //     initialState1.currentTurn,
+        //     initialState1.moveCount,
+        //     initialState1.player1ShipCommitment,
+        //     initialState1.player2ShipCommitment,
+        //     initialState1.player1Hits,
+        //     initialState1.player2Hits,
+        //     initialState1.gameEnded,
+        //     initialState1.winner,
+        //     initialState1.timestamp
+        //     ]]
+        // )));
+
+        // await expect(battleshipWaku.connect(player2).submitInitialState(1, initialState2, signature2, player2ShipProof))
+        // .to.emit(battleshipWaku, "InitialStateSubmitted")
+        // .withArgs(1, player2.address, hre.ethers.keccak256(hre.ethers.AbiCoder.defaultAbiCoder().encode(
+        //     ["tuple(bytes32,uint256,address,uint256,bytes32,bytes32,uint8,uint8,bool,address,uint256)"],
+        //     [[
+        //     initialState2.stateHash,
+        //     initialState2.nonce,
+        //     initialState2.currentTurn,
+        //     initialState2.moveCount,
+        //     initialState2.player1ShipCommitment,
+        //     initialState2.player2ShipCommitment,
+        //     initialState2.player1Hits,
+        //     initialState2.player2Hits,
+        //     initialState2.gameEnded,
+        //     initialState2.winner,
+        //     initialState2.timestamp
+        //     ]]
+        // ))).to.emit(battleshipWaku, "ChannelReady");
+    });
+
+    // it("Should reject duplicate initial state submissions", async function () {
+    //   const { battleshipWaku, player1, player2, gameGenerator } = await loadFixture(deployBattleshipFixture);
+
+    //   await battleshipWaku.connect(player1).openChannel(player2.address);
       
-//       // Generate realistic ship placements for both players
-//       const player1ShipProof = await generateShipPlacementProof(gameGenerator);
-//       const player2ShipProof = await generateShipPlacementProof(gameGenerator);
+    //   const shipProof = await generateShipPlacementProof(gameGenerator);
+    //   const initialState = createGameState({ currentTurn: player1.address });
+    //   const signature = await signGameState(initialState, player1);
 
-//       // Create initial states with real commitments
-//       const initialState1 = createGameState({
-//         currentTurn: player1.address,
-//         player1ShipCommitment: hre.ethers.keccak256(hre.ethers.toUtf8Bytes(player1ShipProof.commitment))
-//       });
-//       const initialState2 = createGameState({
-//         currentTurn: player1.address,
-//         player2ShipCommitment: hre.ethers.keccak256(hre.ethers.toUtf8Bytes(player2ShipProof.commitment))
-//       });
-
-//       const signature1 = await signGameState(initialState1, player1);
-//       const signature2 = await signGameState(initialState2, player2);
-
-//       // Both players submit initial states
-//       await expect(battleshipWaku.connect(player1).submitInitialState(1, initialState1, signature1, player1ShipProof))
-//         .to.emit(battleshipWaku, "InitialStateSubmitted")
-//         .withArgs(1, player1.address, hre.ethers.keccak256(hre.ethers.AbiCoder.defaultAbiCoder().encode(
-//           ["tuple(bytes32,uint256,address,uint256,bytes32,bytes32,uint8,uint8,bool,address,uint256)"],
-//           [[
-//             initialState1.stateHash,
-//             initialState1.nonce,
-//             initialState1.currentTurn,
-//             initialState1.moveCount,
-//             initialState1.player1ShipCommitment,
-//             initialState1.player2ShipCommitment,
-//             initialState1.player1Hits,
-//             initialState1.player2Hits,
-//             initialState1.gameEnded,
-//             initialState1.winner,
-//             initialState1.timestamp
-//           ]]
-//         )));
-
-//       await expect(battleshipWaku.connect(player2).submitInitialState(1, initialState2, signature2, player2ShipProof))
-//         .to.emit(battleshipWaku, "InitialStateSubmitted")
-//         .withArgs(1, player2.address, hre.ethers.keccak256(hre.ethers.AbiCoder.defaultAbiCoder().encode(
-//           ["tuple(bytes32,uint256,address,uint256,bytes32,bytes32,uint8,uint8,bool,address,uint256)"],
-//           [[
-//             initialState2.stateHash,
-//             initialState2.nonce,
-//             initialState2.currentTurn,
-//             initialState2.moveCount,
-//             initialState2.player1ShipCommitment,
-//             initialState2.player2ShipCommitment,
-//             initialState2.player1Hits,
-//             initialState2.player2Hits,
-//             initialState2.gameEnded,
-//             initialState2.winner,
-//             initialState2.timestamp
-//           ]]
-//         ))).to.emit(battleshipWaku, "ChannelReady");
-//     });
-
-//     it("Should reject duplicate initial state submissions", async function () {
-//       const { battleshipWaku, player1, player2, gameGenerator } = await loadFixture(deployBattleshipFixture);
-
-//       await battleshipWaku.connect(player1).openChannel(player2.address);
+    //   // First submission should succeed
+    //   await battleshipWaku.connect(player1).submitInitialState(1, initialState, signature, shipProof);
       
-//       const shipProof = await generateShipPlacementProof(gameGenerator);
-//       const initialState = createGameState({ currentTurn: player1.address });
-//       const signature = await signGameState(initialState, player1);
+    //   // Second submission should fail
+    //   await expect(battleshipWaku.connect(player1).submitInitialState(1, initialState, signature, shipProof))
+    //     .to.be.revertedWith("Already submitted initial state");
+    // });
 
-//       // First submission should succeed
-//       await battleshipWaku.connect(player1).submitInitialState(1, initialState, signature, shipProof);
+    // it("Should reject submissions from non-players", async function () {
+    //   const { battleshipWaku, player1, player2, player3, gameGenerator } = await loadFixture(deployBattleshipFixture);
+
+    //   await battleshipWaku.connect(player1).openChannel(player2.address);
       
-//       // Second submission should fail
-//       await expect(battleshipWaku.connect(player1).submitInitialState(1, initialState, signature, shipProof))
-//         .to.be.revertedWith("Already submitted initial state");
-//     });
+    //   const shipProof = await generateShipPlacementProof(gameGenerator);
+    //   const initialState = createGameState({ currentTurn: player1.address });
+    //   const signature = await signGameState(initialState, player3);
 
-//     it("Should reject submissions from non-players", async function () {
-//       const { battleshipWaku, player1, player2, player3, gameGenerator } = await loadFixture(deployBattleshipFixture);
-
-//       await battleshipWaku.connect(player1).openChannel(player2.address);
-      
-//       const shipProof = await generateShipPlacementProof(gameGenerator);
-//       const initialState = createGameState({ currentTurn: player1.address });
-//       const signature = await signGameState(initialState, player3);
-
-//       await expect(battleshipWaku.connect(player3).submitInitialState(1, initialState, signature, shipProof))
-//         .to.be.revertedWith("Not a player");
-//     });
-//   });
+    //   await expect(battleshipWaku.connect(player3).submitInitialState(1, initialState, signature, shipProof))
+    //     .to.be.revertedWith("Not a player");
+    // });
+  });
 
 //   describe("Game Simulation with Move Sequences", function () {
 //     it("Should simulate a complete game with moves and hits", async function () {
