@@ -11,7 +11,6 @@ import "./ship_placement.sol";
 import "./move_verification.sol";
 import "./win_verification.sol";
 
-
 interface IShipPlacementVerifier {
     function verifyProof(uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[2] calldata _pubSignals) external view returns (bool);
 }
@@ -30,6 +29,16 @@ contract BattleshipStateChannel is Initializable, OwnableUpgradeable, UUPSUpgrad
     IShipPlacementVerifier public shipPlacementVerifier;
     IMoveVerifier public moveVerifier;
     IWinVerifier public winVerifier;
+
+    // A constant hash of the EIP-712 struct type definition.
+    // This is keccak256("GameState(uint256 nonce,address currentTurn,uint256 moveCount,bytes32 player1ShipCommitment,bytes32 player2ShipCommitment,uint8 player1Hits,uint8 player2Hits,bool gameEnded,address winner,uint256 timestamp)")
+    // Make sure there are no spaces and types are canonical (e.g., uint256, not uint).
+    bytes32 public constant GAMESTATE_TYPEHASH = keccak256(
+        "GameState(uint256 nonce,address currentTurn,uint256 moveCount,bytes32 player1ShipCommitment,bytes32 player2ShipCommitment,uint8 player1Hits,uint8 player2Hits,bool gameEnded,address winner,uint256 timestamp)"
+    );
+
+    // The domain separator, unique to this contract instance.
+    bytes32 public DOMAIN_SEPARATOR;
 
     // Game Constants
     uint256 public constant CHALLENGE_PERIOD = 5 minutes;
@@ -77,7 +86,6 @@ contract BattleshipStateChannel is Initializable, OwnableUpgradeable, UUPSUpgrad
     }
 
     struct GameState {
-        bytes32 stateHash;
         uint256 nonce;
         address currentTurn;
         uint256 moveCount;
@@ -147,6 +155,16 @@ contract BattleshipStateChannel is Initializable, OwnableUpgradeable, UUPSUpgrad
         
         nextChannelId = 1;
         nextDisputeId = 1;
+
+        DOMAIN_SEPARATOR = keccak256(
+            abi.encode(
+                keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
+                keccak256(bytes("Battleship")),
+                keccak256(bytes("1")),
+                block.chainid,
+                address(this)
+            )
+        );
     }
 
     function _verifyMoveSequence(
@@ -209,11 +227,53 @@ contract BattleshipStateChannel is Initializable, OwnableUpgradeable, UUPSUpgrad
         return ecrecover(hash, v, r, s);
     }
 
+    /**
+     * @dev Splits a 65-byte signature into its r, s, and v components.
+     * This version is compatible with Solidity ^0.8.0.
+     */
+    function _splitSignature(bytes calldata sig) private pure returns (bytes32 r, bytes32 s, uint8 v) {
+        // The signature must be exactly 65 bytes long.
+        require(sig.length == 65, "invalid signature length");
+
+        assembly {
+            // The location of the signature data in calldata is `sig.offset`.
+            // The first 32 bytes of the signature is the `r` value.
+            r := calldataload(sig.offset)
+            
+            // The next 32 bytes is the `s` value.
+            s := calldataload(add(sig.offset, 32))
+            
+            // The last byte is the `v` value.
+            // We load the 32-byte word starting at the 64th byte, and then extract the first byte.
+            v := byte(0, calldataload(add(sig.offset, 64)))
+        }
+    }
+
     function _determineDisputeWinner(Dispute storage dispute) internal view returns (address) {
         return dispute.challenger;
     }
 
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+
+    // Helper function to compute state hash - reduces stack depth in main functions
+    function _computeStateHash(GameState memory state) internal pure returns (bytes32) {
+        return keccak256(
+            abi.encode(
+                // Use the correct GAMESTATE_TYPEHASH constant
+                keccak256("GameState(uint256 nonce,address currentTurn,uint256 moveCount,bytes32 player1ShipCommitment,bytes32 player2ShipCommitment,uint8 player1Hits,uint8 player2Hits,bool gameEnded,address winner,uint256 timestamp)"),
+                state.nonce,
+                state.currentTurn,
+                state.moveCount,
+                state.player1ShipCommitment,
+                state.player2ShipCommitment,
+                state.player1Hits,
+                state.player2Hits,
+                state.gameEnded,
+                state.winner,
+                state.timestamp
+            )
+        );
+    }
 
     function openChannel(address player2) external returns(uint256 channelId) {
         require(player2 != address(0), "Invalid player addresses");
@@ -234,7 +294,7 @@ contract BattleshipStateChannel is Initializable, OwnableUpgradeable, UUPSUpgrad
 
     function submitInitialState(
         uint256 channelId,
-        GameState calldata initialState,
+        GameState memory initialState,
         bytes calldata signature,
         ShipPlacementProof calldata shipProof
     ) external {
@@ -246,9 +306,40 @@ contract BattleshipStateChannel is Initializable, OwnableUpgradeable, UUPSUpgrad
         bool isShipPlacementValid = shipPlacementVerifier.verifyProof(shipProof.pA, shipProof.pB, shipProof.pC, shipProof.pubSignals);
         require(isShipPlacementValid, "Invalid ship placement proof");
 
-        bytes32 stateHash = keccak256(abi.encode(initialState));
-        require(_verifySignature(stateHash, signature, msg.sender), "Invalid signature");
-        channel.hasSubmittedInitialState[msg.sender] = true;       
+        // 1. Hash the GameState struct data using GAMESTATE_TYPEHASH
+        bytes32 stateHash = keccak256(
+            abi.encode(
+                GAMESTATE_TYPEHASH,
+                initialState.nonce,
+                initialState.currentTurn,
+                initialState.moveCount,
+                initialState.player1ShipCommitment,
+                initialState.player2ShipCommitment,
+                initialState.player1Hits,
+                initialState.player2Hits,
+                initialState.gameEnded,
+                initialState.winner,
+                initialState.timestamp
+            )
+        );
+        
+        // 2. Compute the EIP-712 digest
+        bytes32 digest = keccak256(
+            abi.encodePacked(
+                "\x19\x01", // EIP-191 prefix for signed typed data
+                DOMAIN_SEPARATOR,
+                stateHash
+            )
+        );
+
+        // 3. Recover the signer's address from the digest and signature
+        (bytes32 r, bytes32 s, uint8 v) = _splitSignature(signature);
+        address signer = ecrecover(digest, v, r, s);
+        
+        // 4. Verify that the signer is the message sender
+        require(signer == msg.sender, "Invalid signer");
+
+        channel.hasSubmittedInitialState[msg.sender] = true;
 
         emit InitialStateSubmitted(channelId, msg.sender, stateHash);
 
@@ -262,7 +353,7 @@ contract BattleshipStateChannel is Initializable, OwnableUpgradeable, UUPSUpgrad
     function initiateDispute(
         uint256 channelId,
         DisputeType disputeType,
-        GameState calldata challengedState,
+        GameState memory challengedState,
         bytes calldata signature1,
         bytes calldata signature2
     ) external {
@@ -273,11 +364,24 @@ contract BattleshipStateChannel is Initializable, OwnableUpgradeable, UUPSUpgrad
 
         address respondent = msg.sender == channel.player1 ? channel.player2 : channel.player1;
 
-        // Verify the challenged state has valid signatures
-        bytes32 stateHash = keccak256(abi.encode(challengedState));
+        // Use helper function to compute state hash
+        bytes32 stateHash = _computeStateHash(challengedState);
+    
         require(_verifySignature(stateHash, signature1, channel.player1), "Invalid signature 1");
         require(_verifySignature(stateHash, signature2, channel.player2), "Invalid signature 2");
 
+        // Create dispute - moved to separate scope to reduce stack depth
+        _createDispute(channelId, disputeType, challengedState, stateHash, respondent);
+    }
+
+    // Helper function to create dispute - reduces stack depth
+    function _createDispute(
+        uint256 channelId,
+        DisputeType disputeType,
+        GameState memory challengedState,
+        bytes32 stateHash,
+        address respondent
+    ) internal {
         uint256 disputeId = nextDisputeId++;
         Dispute storage dispute = disputes[disputeId];
 
@@ -293,7 +397,7 @@ contract BattleshipStateChannel is Initializable, OwnableUpgradeable, UUPSUpgrad
         dispute.challengedState = challengedState;
 
         channelToDispute[channelId] = disputeId;
-        channel.status = ChannelStatus.Disputed;
+        channels[channelId].status = ChannelStatus.Disputed;
 
         // Store the challenged state
         gameStates[stateHash] = challengedState;
@@ -303,7 +407,7 @@ contract BattleshipStateChannel is Initializable, OwnableUpgradeable, UUPSUpgrad
 
     function respondToDispute(
         uint256 disputeId,
-        GameState calldata counterState,
+        GameState memory counterState,
         bytes calldata signature1,
         bytes calldata signature2,
         MoveProof[] calldata moveProofs
@@ -318,7 +422,7 @@ contract BattleshipStateChannel is Initializable, OwnableUpgradeable, UUPSUpgrad
         // Verify that the counter-state has high nonce
         require(counterState.nonce > dispute.challengedNonce, "Nonce too low. Counter-state must have higher nonce");
 
-        bytes32 counterStateHash = keccak256(abi.encode(counterState));
+        bytes32 counterStateHash = _computeStateHash(counterState);
         require(_verifySignature(counterStateHash, signature1, channel.player1), "Invalid signature 1");
         require(_verifySignature(counterStateHash, signature2, channel.player2), "Invalid signature 2");
 
@@ -369,7 +473,7 @@ contract BattleshipStateChannel is Initializable, OwnableUpgradeable, UUPSUpgrad
 
     function settleChannel(
         uint256 channelId, 
-        GameState calldata finalState,
+        GameState memory finalState,
         bytes calldata signature1,
         bytes calldata signature2,
         WinProof calldata winProof
@@ -380,7 +484,7 @@ contract BattleshipStateChannel is Initializable, OwnableUpgradeable, UUPSUpgrad
         require(channel.hasSubmittedInitialState[channel.player1] && channel.hasSubmittedInitialState[channel.player2], "Both players must submit initial state");
         require(channelToDispute[channelId] == 0, "Channel has an active dispute on-going!");
 
-        bytes32 stateHash = keccak256(abi.encode(finalState));
+        bytes32 stateHash = _computeStateHash(finalState);
         require(_verifySignature(stateHash, signature1, channel.player1), "Invalid Player 1 signature");
         require(_verifySignature(stateHash, signature2, channel.player2), "Invalid Player 2 signature");
 

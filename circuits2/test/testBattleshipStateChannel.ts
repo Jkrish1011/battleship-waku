@@ -5,7 +5,7 @@ const {
   time,
 } = require("@nomicfoundation/hardhat-toolbox/network-helpers");
 
-const { BattleshipGameGenerator } = require("./helpers/GameGenerator");
+const { GameStateChannel } = require("./helpers/GameStateChannel");
 const fs = require("fs");
 const path = require("path");
 const verificationKeyJson = require("../keys/ship_verification_key.json");
@@ -14,9 +14,48 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
   // Increase timeout for zk proof generation
   this.timeout(120000);
 
+  // Helper function to create realistic game state
+  function createGameState(options = {}) {
+    const defaults = {
+      stateHash: hre.ethers.ZeroHash,
+      nonce: 1,
+      currentTurn: hre.ethers.ZeroAddress,
+      moveCount: 0,
+      player1ShipCommitment: hre.ethers.keccak256(hre.ethers.toUtf8Bytes("player1_ships")),
+      player2ShipCommitment: hre.ethers.keccak256(hre.ethers.toUtf8Bytes("player2_ships")),
+      player1Hits: 0,
+      player2Hits: 0,
+      gameEnded: false,
+      winner: hre.ethers.ZeroAddress,
+      timestamp: Math.floor(Date.now() / 1000)
+    };
+    
+    return { ...defaults, ...options };
+  }
+
+  async function signGameState(gameState: any, signer: any) {
+    const stateHash = hre.ethers.keccak256(hre.ethers.AbiCoder.defaultAbiCoder().encode(
+      ["tuple(bytes32,uint256,address,uint256,bytes32,bytes32,uint8,uint8,bool,address,uint256)"],
+      [[
+        gameState.stateHash,
+        gameState.nonce,
+        gameState.currentTurn,
+        gameState.moveCount,
+        gameState.player1ShipCommitment,
+        gameState.player2ShipCommitment,
+        gameState.player1Hits,
+        gameState.player2Hits,
+        gameState.gameEnded,
+        gameState.winner,
+        gameState.timestamp
+      ]]
+    ));
+    
+    return await signer.signMessage(hre.ethers.getBytes(stateHash));
+  }
+
+
   async function deployBattleshipFixture() {
-    const gameGenerator = new BattleshipGameGenerator();
-    await gameGenerator.initialize();
     const [owner, player1, player2, player3] = await hre.ethers.getSigners();
     
     const shipPlacementVerifier = await hre.ethers.deployContract("ShipPlacementVerifier");
@@ -38,6 +77,13 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
     });
     
     await battleshipWaku.waitForDeployment();
+    console.log("BattleshipWaku deployed to:", battleshipWaku.target);
+    
+    const gameStateChannel = new GameStateChannel("387", player1, 31337, battleshipWaku.target);
+    await gameStateChannel.initialize();
+
+    const gameStateChannel2 = new GameStateChannel("387", player2, 31337, battleshipWaku.target);
+    await gameStateChannel2.initialize();
 
     return { 
       shipPlacementVerifier, 
@@ -48,7 +94,8 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
       player1, 
       player2, 
       player3, 
-      gameGenerator 
+      gameStateChannel,
+      gameStateChannel2 
     };
   }
 
@@ -113,15 +160,15 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
 
   describe("Initial State Submission with Real Ship Placements", function () {
     it("Should allow both players to submit valid initial states", async function () {
-        const { battleshipWaku, player1, player2, gameGenerator,shipPlacementVerifier } = await loadFixture(deployBattleshipFixture);
+        const { battleshipWaku, player1, player2, gameStateChannel, shipPlacementVerifier, gameStateChannel2 } = await loadFixture(deployBattleshipFixture);
 
-        // Open channel
-        await battleshipWaku.connect(player1).openChannel(player2.address);
+        // Here is the assumption is that both players have sent ready state.
+
         let shipPlacementPositionsPlayer1 = null, shipPlacementPositionsPlayer2 = null, shipPositions1 = null, shipPositions2 = null;
         while (true) {
-            shipPositions1 = gameGenerator.generateRandomShipPositions();
-            shipPlacementPositionsPlayer1 = await gameGenerator.generateShipPlacementPositions(shipPositions1);
-            const isValid = gameGenerator.validateInput(shipPlacementPositionsPlayer1.ships, shipPlacementPositionsPlayer1.board_state)
+            shipPositions1 = gameStateChannel.generateRandomShipPositions();
+            shipPlacementPositionsPlayer1 = await gameStateChannel.generateShipPlacementPositions(shipPositions1);
+            const isValid = gameStateChannel.validateInput(shipPlacementPositionsPlayer1.ships, shipPlacementPositionsPlayer1.board_state)
             console.log("isValid", isValid);
             if (isValid) {
                 break;
@@ -129,9 +176,9 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
         }
         console.log("shipPlacementPositionsPlayer1: ", shipPlacementPositionsPlayer1);
         while (true) {
-            shipPositions2 = gameGenerator.generateRandomShipPositions();
-            shipPlacementPositionsPlayer2 = await gameGenerator.generateShipPlacementPositions(shipPositions2);
-            if (gameGenerator.validateInput(shipPlacementPositionsPlayer2.ships, shipPlacementPositionsPlayer2.board_state)) {
+            shipPositions2 = gameStateChannel2.generateRandomShipPositions();
+            shipPlacementPositionsPlayer2 = await gameStateChannel2.generateShipPlacementPositions(shipPositions2);
+            if (gameStateChannel2.validateInput(shipPlacementPositionsPlayer2.ships, shipPlacementPositionsPlayer2.board_state)) {
                 break;
             }
         }
@@ -161,23 +208,24 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
         // console.log("zkey buffer size:", zkeyBuffer.length);
         console.log("--");
 
-        const {proof, calldata} = await gameGenerator.generateProof(shipPlacementPositionsPlayer1, wasmPath, zkeyPath);
+        const {proof: proofPlayer1, calldata: calldataPlayer1} = await gameStateChannel.generateProof(shipPlacementPositionsPlayer1, wasmPath, zkeyPath);
         // console.log(proofPlayer1);
         const proofPlayer1_converted = {
-            pA: calldata[0],
-            pB: calldata[1],
-            pC: calldata[2],
-            pubSignals: calldata[3]
+            pA: calldataPlayer1[0],
+            pB: calldataPlayer1[1],
+            pC: calldataPlayer1[2],
+            pubSignals: calldataPlayer1[3]
         };
         
-        console.log("proofPlayer1", calldata);
-        let offchainVerification = await gameGenerator.verifyProof(verificationKeyJson, proof);
+        let offchainVerification = await gameStateChannel.verifyProof(verificationKeyJson, proofPlayer1);
         console.log("Offchain verification proof", offchainVerification);
         
         let result = await shipPlacementVerifier.verifyProof(proofPlayer1_converted.pA, proofPlayer1_converted.pB, proofPlayer1_converted.pC, proofPlayer1_converted.pubSignals);
-        console.log("result", result);
+        
 
-        const {proof: _proofPlayer2, calldata: proofPlayer2} = await gameGenerator.generateProof(shipPlacementPositionsPlayer2, wasmPath, zkeyPath);
+        const player1_gameState = await gameStateChannel.generateShipPlacementProof(proofPlayer1_converted, shipPlacementPositionsPlayer1.ships, shipPlacementPositionsPlayer1.board_state, shipPlacementPositionsPlayer1.salt, shipPlacementPositionsPlayer1.commitment, shipPlacementPositionsPlayer1.merkle_root);
+
+        const {proof: _proofPlayer2, calldata: proofPlayer2} = await gameStateChannel2.generateProof(shipPlacementPositionsPlayer2, wasmPath, zkeyPath);
         const proofPlayer2_converted = {
           pA: proofPlayer2[0],
           pB: proofPlayer2[1],
@@ -187,6 +235,106 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
         let result2 = await shipPlacementVerifier.verifyProof(proofPlayer2_converted.pA, proofPlayer2_converted.pB, proofPlayer2_converted.pC, proofPlayer2_converted.pubSignals);
         console.log("result2", result2);
 
+        const player2_gameState = await gameStateChannel2.generateShipPlacementProof(proofPlayer2_converted, shipPlacementPositionsPlayer2.ships, shipPlacementPositionsPlayer2.board_state, shipPlacementPositionsPlayer2.salt, shipPlacementPositionsPlayer2.commitment, shipPlacementPositionsPlayer2.merkle_root);
+        
+        const stateSignature_createGame = await gameStateChannel.createGame(
+          "1",
+          "333",
+          player1.address,
+          player1_gameState.commitment,
+          player1_gameState.merkleRoot,
+          player1_gameState.player1ShipPlacementProof,
+          player2.address,
+          player2_gameState.commitment,
+          player2_gameState.merkleRoot,
+          player2_gameState.player2ShipPlacementProof
+        );
+
+        if (stateSignature_createGame === "") {
+            throw new Error("Game creation failed");
+        }
+
+        const stateSignature_createGame2 = await gameStateChannel2.createGame(
+          "1",
+          "333",
+          player1.address,
+          player1_gameState.commitment,
+          player1_gameState.merkleRoot,
+          player1_gameState.player1ShipPlacementProof,
+          player2.address,
+          player2_gameState.commitment,
+          player2_gameState.merkleRoot,
+          player2_gameState.player2ShipPlacementProof
+        );
+
+        if (stateSignature_createGame2 === "") {
+            throw new Error("Game creation failed");
+        }
+
+        // Open channel
+        const tx = await battleshipWaku.connect(player1).openChannel(player2.address);
+        const receipt = await tx.wait();
+        // Method 1: Get channelId from event logs
+        const channelOpenedEvent = receipt.logs.find((log: any) => {
+            try {
+                const parsed = battleshipWaku.interface.parseLog(log);
+                return parsed?.name === 'ChannelOpened';
+            } catch {
+                return false;
+            }
+        });
+        
+        const channelId = channelOpenedEvent ? 
+            battleshipWaku.interface.parseLog(channelOpenedEvent).args.channelId : 
+            null;
+        
+        console.log("Channel opened with id ", channelId);    
+        const game = await gameStateChannel.getGameState();
+        const game_converted = {
+          nonce: game.nonce,
+          currentTurn: game.currentTurn,
+          moveCount: game.moveCount,
+          player1ShipCommitment: game.player1ShipCommitment,
+          player2ShipCommitment: game.player2ShipCommitment,
+          player1Hits: game.player1Hits,
+          player2Hits: game.player2Hits,
+          gameEnded: game.gameEnded,
+          winner: game.winner,
+          timestamp: game.timestamp
+        }
+        
+        const txSubmitInitialState_player1 = await battleshipWaku.connect(player1).submitInitialState(
+          channelId,
+          game_converted,
+          stateSignature_createGame,
+          proofPlayer1_converted
+        );
+        const receiptSubmitInitialState_player1 = await txSubmitInitialState_player1.wait();
+        console.log("Submit initial state player 1 receipt", receiptSubmitInitialState_player1);
+
+        const game2 = await gameStateChannel2.getGameState();
+        const game_converted2 = {
+          nonce: game2.nonce,
+          currentTurn: game2.currentTurn,
+          moveCount: game2.moveCount,
+          player1ShipCommitment: game2.player1ShipCommitment,
+          player2ShipCommitment: game2.player2ShipCommitment,
+          player1Hits: game2.player1Hits,
+          player2Hits: game2.player2Hits,
+          gameEnded: game2.gameEnded,
+          winner: game2.winner,
+          timestamp: game2.timestamp
+        }
+
+        const txSubmitInitialState_player2 = await battleshipWaku.connect(player2).submitInitialState(
+          channelId,
+          game_converted2,
+          stateSignature_createGame2,
+          proofPlayer2_converted
+        );
+        const receiptSubmitInitialState_player2 = await txSubmitInitialState_player2.wait();
+        console.log("Submit initial state player 2 receipt", receiptSubmitInitialState_player2);
+        
         // // Create initial states with real commitments
         // const initialState1 = createGameState({
         // currentTurn: player1.address,
@@ -241,11 +389,11 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
     });
 
     // it("Should reject duplicate initial state submissions", async function () {
-    //   const { battleshipWaku, player1, player2, gameGenerator } = await loadFixture(deployBattleshipFixture);
+    //   const { battleshipWaku, player1, player2, gameStateChannel } = await loadFixture(deployBattleshipFixture);
 
     //   await battleshipWaku.connect(player1).openChannel(player2.address);
       
-    //   const shipProof = await generateShipPlacementProof(gameGenerator);
+    //   const shipProof = await generateShipPlacementProof(gameStateChannel);
     //   const initialState = createGameState({ currentTurn: player1.address });
     //   const signature = await signGameState(initialState, player1);
 
@@ -258,11 +406,11 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
     // });
 
     // it("Should reject submissions from non-players", async function () {
-    //   const { battleshipWaku, player1, player2, player3, gameGenerator } = await loadFixture(deployBattleshipFixture);
+    //   const { battleshipWaku, player1, player2, player3, gameStateChannel } = await loadFixture(deployBattleshipFixture);
 
     //   await battleshipWaku.connect(player1).openChannel(player2.address);
       
-    //   const shipProof = await generateShipPlacementProof(gameGenerator);
+    //   const shipProof = await generateShipPlacementProof(gameStateChannel);
     //   const initialState = createGameState({ currentTurn: player1.address });
     //   const signature = await signGameState(initialState, player3);
 
@@ -273,13 +421,13 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
 
 //   describe("Game Simulation with Move Sequences", function () {
 //     it("Should simulate a complete game with moves and hits", async function () {
-//       const { battleshipWaku, player1, player2, gameGenerator } = await loadFixture(deployBattleshipFixture);
+//       const { battleshipWaku, player1, player2, gameStateChannel } = await loadFixture(deployBattleshipFixture);
 
 //       // Setup channel and initial states
 //       await battleshipWaku.connect(player1).openChannel(player2.address);
       
-//       const player1ShipProof = await generateShipPlacementProof(gameGenerator);
-//       const player2ShipProof = await generateShipPlacementProof(gameGenerator);
+//       const player1ShipProof = await generateShipPlacementProof(gameStateChannel);
+//       const player2ShipProof = await generateShipPlacementProof(gameStateChannel);
 
 //       const initialState1 = createGameState({
 //         currentTurn: player1.address,
@@ -345,13 +493,13 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
 
 //   describe("Dispute Resolution System", function () {
 //     it("Should handle dispute initiation and resolution", async function () {
-//       const { battleshipWaku, player1, player2, gameGenerator } = await loadFixture(deployBattleshipFixture);
+//       const { battleshipWaku, player1, player2, gameStateChannel } = await loadFixture(deployBattleshipFixture);
 
 //       // Setup channel
 //       await battleshipWaku.connect(player1).openChannel(player2.address);
       
-//       const shipProof1 = await generateShipPlacementProof(gameGenerator);
-//       const shipProof2 = await generateShipPlacementProof(gameGenerator);
+//       const shipProof1 = await generateShipPlacementProof(gameStateChannel);
+//       const shipProof2 = await generateShipPlacementProof(gameStateChannel);
 
 //       const initialState1 = createGameState({ currentTurn: player1.address });
 //       const initialState2 = createGameState({ currentTurn: player1.address });
@@ -416,13 +564,13 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
 //     });
 
 //     it("Should handle dispute response with counter-state", async function () {
-//       const { battleshipWaku, player1, player2, gameGenerator } = await loadFixture(deployBattleshipFixture);
+//       const { battleshipWaku, player1, player2, gameStateChannel } = await loadFixture(deployBattleshipFixture);
 
 //       // Setup channel
 //       await battleshipWaku.connect(player1).openChannel(player2.address);
       
-//       const shipProof1 = await generateShipPlacementProof(gameGenerator);
-//       const shipProof2 = await generateShipPlacementProof(gameGenerator);
+//       const shipProof1 = await generateShipPlacementProof(gameStateChannel);
+//       const shipProof2 = await generateShipPlacementProof(gameStateChannel);
 
 //       const initialState1 = createGameState({ currentTurn: player1.address });
 //       const initialState2 = createGameState({ currentTurn: player1.address });
@@ -518,7 +666,7 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
 
 //   describe("Ship Placement Validation", function () {
 //     it("Should validate ship placements using game generator", async function () {
-//       const { gameGenerator } = await loadFixture(deployBattleshipFixture);
+//       const { gameStateChannel } = await loadFixture(deployBattleshipFixture);
 
 //       // Test valid ship placements
 //       const validShips = [
@@ -529,14 +677,14 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
 //         [4, 0, 2, 0]  // Ship of length 2, horizontal
 //       ];
 
-//       const validInput = await gameGenerator.generateCorrectInput(validShips);
+//       const validInput = await gameStateChannel.generateCorrectInput(validShips);
 //       expect(validInput).to.have.property('ships');
 //       expect(validInput).to.have.property('board_state');
 //       expect(validInput).to.have.property('commitment');
 //       expect(validInput).to.have.property('merkle_root');
 
 //       // Test ship validation
-//       const isValid = gameGenerator.validateInput(validShips, validInput.board_state);
+//       const isValid = gameStateChannel.validateInput(validShips, validInput.board_state);
 //       expect(isValid).to.be.true;
 
 //       // Test invalid overlapping ships
@@ -548,16 +696,16 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
 //         [4, 0, 2, 0]
 //       ];
 
-//       const invalidInput = await gameGenerator.generateCorrectInput(invalidShips);
-//       const isInvalid = gameGenerator.validateInput(invalidShips, invalidInput.board_state);
+//       const invalidInput = await gameStateChannel.generateCorrectInput(invalidShips);
+//       const isInvalid = gameStateChannel.validateInput(invalidShips, invalidInput.board_state);
 //       expect(isInvalid).to.be.false;
 //     });
 
 //     it("Should generate random ship positions within bounds", async function () {
-//       const { gameGenerator } = await loadFixture(deployBattleshipFixture);
+//       const { gameStateChannel } = await loadFixture(deployBattleshipFixture);
 
 //       for (let i = 0; i < 10; i++) {
-//         const randomShips = gameGenerator.generateRandomShipPositions();
+//         const randomShips = gameStateChannel.generateRandomShipPositions();
 //         expect(randomShips).to.have.length(5); // 5 ships
 
 //         // Validate each ship is within bounds
@@ -565,7 +713,7 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
 //           const [x, y, length, orientation] = ship;
 //           expect(x).to.be.at.least(0).and.at.most(9);
 //           expect(y).to.be.at.least(0).and.at.most(9);
-//           expect(length).to.equal(gameGenerator.shipSizes[index]);
+//           expect(length).to.equal(gameStateChannel.shipSizes[index]);
 //           expect(orientation).to.be.oneOf([0, 1]);
 
 //           // Check ship doesn't extend beyond board
@@ -580,11 +728,11 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
 
 //   describe("Error Handling and Edge Cases", function () {
 //     it("Should handle invalid signatures gracefully", async function () {
-//       const { battleshipWaku, player1, player2, gameGenerator } = await loadFixture(deployBattleshipFixture);
+//       const { battleshipWaku, player1, player2, gameStateChannel } = await loadFixture(deployBattleshipFixture);
 
 //       await battleshipWaku.connect(player1).openChannel(player2.address);
       
-//       const shipProof = await generateShipPlacementProof(gameGenerator);
+//       const shipProof = await generateShipPlacementProof(gameStateChannel);
 //       const initialState = createGameState({ currentTurn: player1.address });
       
 //       // Create signature with wrong signer
@@ -595,7 +743,7 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
 //     });
 
 //     it("Should prevent operations on closed channels", async function () {
-//       const { battleshipWaku, player1, player2, gameGenerator } = await loadFixture(deployBattleshipFixture);
+//       const { battleshipWaku, player1, player2, gameStateChannel } = await loadFixture(deployBattleshipFixture);
 
 //       await battleshipWaku.connect(player1).openChannel(player2.address);
       
@@ -603,7 +751,7 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
 //       await time.increase(2200);
 //       await battleshipWaku.connect(player1).claimTimeout(1);
 
-//       const shipProof = await generateShipPlacementProof(gameGenerator);
+//       const shipProof = await generateShipPlacementProof(gameStateChannel);
 //       const initialState = createGameState({ currentTurn: player1.address });
 //       const signature = await signGameState(initialState, player1);
 

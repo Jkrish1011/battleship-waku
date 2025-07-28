@@ -25,6 +25,7 @@ module.exports = {
           yul: true, // Enable Yul optimizer if applicable
         },
       },
+      viaIR: true,
       outputSelection: {
         "*": {
           "*": ["*"],
