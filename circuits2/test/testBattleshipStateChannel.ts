@@ -274,7 +274,7 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
         // Open channel
         const tx = await battleshipWaku.connect(player1).openChannel(player2.address);
         const receipt = await tx.wait();
-        // Method 1: Get channelId from event logs
+        
         const channelOpenedEvent = receipt.logs.find((log: any) => {
             try {
                 const parsed = battleshipWaku.interface.parseLog(log);
@@ -312,6 +312,24 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
         const receiptSubmitInitialState_player1 = await txSubmitInitialState_player1.wait();
         console.log("Submit initial state player 1 receipt", receiptSubmitInitialState_player1);
 
+        const submitInitialStateEvent_player1 = receiptSubmitInitialState_player1.logs.find((log: any) => {
+          try {
+              const parsed = battleshipWaku.interface.parseLog(log);
+              return parsed?.name === 'InitialStateSubmitted';
+          } catch {
+              return false;
+          }
+        });
+        
+        const stateHash_player1 = submitInitialStateEvent_player1 ? 
+            battleshipWaku.interface.parseLog(submitInitialStateEvent_player1).args.stateHash : 
+            null;
+
+        console.log("State hash submit initial state player 1", stateHash_player1);
+
+        const gameState_Player1 = await battleshipWaku.getGameState(stateHash_player1);
+        console.log("Game state:: Player 1", gameState_Player1);
+        
         const game2 = await gameStateChannel2.getGameState();
         const game_converted2 = {
           nonce: game2.nonce,
@@ -333,8 +351,25 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
           proofPlayer2_converted
         );
         const receiptSubmitInitialState_player2 = await txSubmitInitialState_player2.wait();
-        console.log("Submit initial state player 2 receipt", receiptSubmitInitialState_player2);
+        // console.log("Submit initial state player 2 receipt", receiptSubmitInitialState_player2);
+
+        const submitInitialStateEvent_player2 = receiptSubmitInitialState_player2.logs.find((log: any) => {
+          try {
+              const parsed = battleshipWaku.interface.parseLog(log);
+              return parsed?.name === 'InitialStateSubmitted';
+          } catch {
+              return false;
+          }
+        });
         
+        const stateHash_player2 = submitInitialStateEvent_player2 ? 
+            battleshipWaku.interface.parseLog(submitInitialStateEvent_player2).args.stateHash : 
+            null;
+
+        console.log("StateHash submit initial state player 2", stateHash_player2);
+        
+        const gameState_Player2 = await battleshipWaku.getGameState(stateHash_player2);
+        console.log("Game state:: Player 2", gameState_Player2);
         // // Create initial states with real commitments
         // const initialState1 = createGameState({
         // currentTurn: player1.address,
