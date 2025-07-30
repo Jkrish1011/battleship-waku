@@ -71,7 +71,7 @@ interface GameState {
     wakuRoomId: string;
     player1: string;
     player2: string;
-
+    localPlayerRole: 'initiator' | 'challenger';
 }
 
 interface ContractInteraction {
@@ -140,7 +140,7 @@ export class GameStateChannel {
     private chainId: number;
     private contractAddress: string;
 
-    constructor(wakuRoomId: string, signer: ethers.Signer, chainId: number, contractAddress: string) {
+    constructor(wakuRoomId: string, signer: ethers.Signer, chainId: number, contractAddress: string, localPlayerRole: 'initiator' | 'challenger') {
         this.gameState = {
             stateHash: "",
             nonce: 0,
@@ -156,7 +156,8 @@ export class GameStateChannel {
             wakuRoomId: wakuRoomId,
             player1: "",
             player2: "",
-            winner: ethers.ZeroAddress
+            winner: ethers.ZeroAddress,
+            localPlayerRole: localPlayerRole
         };
         this.signer = signer;
         this.poseidon = null;
@@ -306,15 +307,14 @@ export class GameStateChannel {
         return BigInt(bytes32);
     }
 
-    private validateMoveProof(
-        moveProof: ZKCalldataProof, 
-        moveProofPublicData: ZKProofPublicData, 
-        move: Move
-    ): boolean {
-        // Implement move proof validation logic with ZK.
-
-        return true;
-    }
+    // private validateMoveProof(
+    //     moveProof: ZKCalldataProof, 
+    //     moveProofPublicData: ZKProofPublicData, 
+    //     move: Move
+    // ): boolean {
+        
+    //     return true;
+    // }
 
     async declareWinner(
         winner: string,
@@ -338,7 +338,6 @@ export class GameStateChannel {
         if (winnerHits < 17) {
             throw new GameStateChannelError("Winner has not hit enough ships");
         }
-
 
         this.gameState.winner = winner;
         this.gameState.nonce++;
@@ -533,8 +532,8 @@ export class GameStateChannel {
     }
 
     private async handleMoveMessage(message: StateChannelMessage): Promise<void> {
-        const { player, move, moveProof, moveProofPublicData } = message.data;
-        await this.makeMove(player, move, moveProof, moveProofPublicData);
+        const { player, move } = message.data;
+        await this.makeMove(player, move);
     }
 
     private async handleWinClaimMessage(message: StateChannelMessage): Promise<void> {
@@ -930,8 +929,6 @@ export class GameStateChannel {
     }
 
     async verifyProof(verificationKeyPath:any, proof:any) {
-        console.log("verificationKeyPath", verificationKeyPath);
-        console.log("proof", proof);
         const isValid = await snarkjs.groth16.verify(verificationKeyPath, proof.publicSignals, proof.proof);
         return isValid;
     }
@@ -940,6 +937,19 @@ export class GameStateChannel {
         return '0x' + BigInt(decimal).toString(16);
     }
 
+    async isMyTurn(): Promise<boolean> {
+        if (!this.gameState) {
+            throw new GameStateChannelError("Game state not initialized");
+        }
+
+        if (!this.signer) {
+            throw new GameStateChannelError("Signer not initialized");
+        }
+
+        const myAddress = await this.signer.getAddress();
+        return this.gameState.currentTurn === myAddress;
+    }
+    
     async createGame(
         gameId: string,
         wakuRoomId: string,
@@ -971,6 +981,8 @@ export class GameStateChannel {
             this.gameState.gameEnded = false;
             this.gameState.timestamp = Date.now();
 
+            this.gameState.localPlayerRole = (await this.signer?.getAddress()) === player1 ? "initiator" : "challenger";
+
             const signature = await this.signGameState(this.chainId, this.contractAddress);
             // this.gameState.stateHash = this.computeStateHash();
             this.emit('gameCreated', this.gameState);
@@ -982,59 +994,87 @@ export class GameStateChannel {
         }
     }
 
-    async makeMove(
-        player: string,
-        move: Move, 
-        moveProof: ZKCalldataProof,
-        moveProofPublicData: ZKProofPublicData
-    ): Promise<boolean> {
+    acknowledgeMove(): boolean {
         if (!this.gameState) {
             throw new GameStateChannelError("Game state not initialized!");
         }
     
-        if (this.gameState.gameEnded) {  // Fix: should be !gameEnded
+        if (this.gameState.gameEnded) { 
             throw new InvalidMoveError("Game is already finished");
         }
     
-        if (this.gameState.currentTurn !== player) {
+        if (this.gameState.winner != ethers.ZeroAddress) {
+            throw new InvalidMoveError("Game is already finished");
+        }
+    
+        try{
+            this.gameState.currentTurn = this.gameState.currentTurn === this.gameState.player1 ? this.gameState.player2 : this.gameState.player1;
+            this.emit('moveAcknowledged', { nextTurn: this.gameState.currentTurn, gameState: this.gameState });
+            return true;
+        }catch(err){
+            console.error(err);
+            return false;
+        }
+    }
+
+    async makeMove(
+        move: Move
+    ): Promise<string> {
+        if (!this.gameState) {
+            throw new GameStateChannelError("Game state not initialized!");
+        }
+    
+        if (this.gameState.gameEnded) {  
+            throw new InvalidMoveError("Game is already finished");
+        }
+    
+        // if (this.gameState.currentTurn !== player) {
+        //     throw new InvalidMoveError("Not your turn");
+        // }
+
+        if(this.gameState.currentTurn === (this.gameState.localPlayerRole === "initiator" ? this.gameState.player1 : this.gameState.player2)) {
             throw new InvalidMoveError("Not your turn");
         }
     
-        if (this.gameState.winner) {
+        if (this.gameState.winner != ethers.ZeroAddress) {
             throw new InvalidMoveError("Game is already finished");
         }
-    
-        if (!this.validateMoveProof(moveProof, moveProofPublicData, move)) {
-            throw new InvalidMoveError("Invalid move proof");
-        }
-    
-        // update the game states
-        this.gameState.nonce++;
-        this.gameState.moveCount++; // Add this line
         
-        if (move.isHit) {
-            if (player === this.gameState.player1) {
-                this.gameState.player1Hits++;
-            } else {
-                this.gameState.player2Hits++;
+        try{
+            // if (!this.validateMoveProof(moveProof, moveProofPublicData, move)) {
+            //     throw new InvalidMoveError("Invalid move proof");
+            // }
+        
+            // update the game states
+            this.gameState.nonce++;
+            this.gameState.moveCount++; 
+            
+            if (move.isHit) {
+                if (this.gameState.currentTurn === this.gameState.player1) {
+                    this.gameState.player1Hits++;
+                } else {
+                    this.gameState.player2Hits++;
+                }
             }
+        
+            // Switch turns
+            console.log("Current Turn ", this.gameState.currentTurn);
+            this.gameState.currentTurn = this.gameState.currentTurn === this.gameState.player1 ? this.gameState.player2 : this.gameState.player1;
+        
+            const signature = await this.signGameState(this.chainId, this.contractAddress);
+            this.emit('moveMade', { playerRole: this.gameState.localPlayerRole , move, gameState: this.gameState });
+        
+            // Check for win condition (17 total ship cells)
+            if (this.gameState.player1Hits === 17 || this.gameState.player2Hits === 17) {
+                const winner = this.gameState.player1Hits === 17 ? this.gameState.player1 : this.gameState.player2;
+                await this.declareWinner(winner);
+            }
+        
+            return signature;
+        }catch(error) {
+            console.error(error);
+            return "";
         }
-      
-        // Switch turns
-        this.gameState.currentTurn = this.gameState.currentTurn === this.gameState.player1 
-        ? this.gameState.player2 
-        : this.gameState.player1;
-    
-        // Fix the signGameState call
-        const signature = await this.signGameState(this.chainId, this.contractAddress);
-        this.emit('moveMade', { player, move, gameState: this.gameState });
-    
-        // Check for win condition (assuming 17 total ship cells)
-        if (this.gameState.player1Hits === 17 || this.gameState.player2Hits === 17) {
-            const winner = this.gameState.player1Hits === 17 ? this.gameState.player1 : this.gameState.player2;
-            await this.declareWinner(winner);
-        }
-    
-        return true;
+       
     }
 }
