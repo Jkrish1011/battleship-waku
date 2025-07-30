@@ -8,7 +8,6 @@ const {
 const { GameStateChannel } = require("./helpers/GameStateChannel");
 const fs = require("fs");
 const path = require("path");
-const verificationKeyJson = require("../keys/ship_verification_key.json");
 
 describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
   // Increase timeout for zk proof generation
@@ -79,10 +78,10 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
     await battleshipWaku.waitForDeployment();
     console.log("BattleshipWaku deployed to:", battleshipWaku.target);
     
-    const gameStateChannel = new GameStateChannel("387", player1, 31337, battleshipWaku.target);
+    const gameStateChannel = new GameStateChannel("387", player1, 31337, battleshipWaku.target, "initiator");
     await gameStateChannel.initialize();
 
-    const gameStateChannel2 = new GameStateChannel("387", player2, 31337, battleshipWaku.target);
+    const gameStateChannel2 = new GameStateChannel("387", player2, 31337, battleshipWaku.target, "challenger");
     await gameStateChannel2.initialize();
 
     return { 
@@ -158,9 +157,9 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
     });
   });
 
-  describe("Initial State Submission with Real Ship Placements", function () {
-    it("Should allow both players to submit valid initial states", async function () {
-        const { battleshipWaku, player1, player2, gameStateChannel, shipPlacementVerifier, gameStateChannel2 } = await loadFixture(deployBattleshipFixture);
+  describe("Game Play", function () {
+    it("Should allow both players to submit valid initial states and do a happy path full game play", async function () {
+        const { battleshipWaku, player1, player2, gameStateChannel, shipPlacementVerifier, gameStateChannel2, moveVerifier, winVerifier } = await loadFixture(deployBattleshipFixture);
 
         // Here is the assumption is that both players have sent ready state.
 
@@ -201,11 +200,7 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
         console.log("zkeyPath", zkeyPath);
         console.log("verificationKeyPath", verificationKeyPath);
 
-        const verification = fs.readFileSync(verificationKeyPath);
-        // const wasmBuffer = fs.readFileSync(wasmPath);
-        // const zkeyBuffer = fs.readFileSync(zkeyPath);
-        // console.log("WASM buffer size:", wasmBuffer.length);
-        // console.log("zkey buffer size:", zkeyBuffer.length);
+        const verification = JSON.parse(fs.readFileSync(verificationKeyPath));
         console.log("--");
 
         const {proof: proofPlayer1, calldata: calldataPlayer1} = await gameStateChannel.generateProof(shipPlacementPositionsPlayer1, wasmPath, zkeyPath);
@@ -217,7 +212,7 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
             pubSignals: calldataPlayer1[3]
         };
         
-        let offchainVerification = await gameStateChannel.verifyProof(verificationKeyJson, proofPlayer1);
+        let offchainVerification = await gameStateChannel.verifyProof(verification, proofPlayer1);
         console.log("Offchain verification proof", offchainVerification);
         
         let result = await shipPlacementVerifier.verifyProof(proofPlayer1_converted.pA, proofPlayer1_converted.pB, proofPlayer1_converted.pC, proofPlayer1_converted.pubSignals);
@@ -274,7 +269,7 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
         // Open channel
         const tx = await battleshipWaku.connect(player1).openChannel(player2.address);
         const receipt = await tx.wait();
-        // Method 1: Get channelId from event logs
+        
         const channelOpenedEvent = receipt.logs.find((log: any) => {
             try {
                 const parsed = battleshipWaku.interface.parseLog(log);
@@ -312,6 +307,24 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
         const receiptSubmitInitialState_player1 = await txSubmitInitialState_player1.wait();
         console.log("Submit initial state player 1 receipt", receiptSubmitInitialState_player1);
 
+        const submitInitialStateEvent_player1 = receiptSubmitInitialState_player1.logs.find((log: any) => {
+          try {
+              const parsed = battleshipWaku.interface.parseLog(log);
+              return parsed?.name === 'InitialStateSubmitted';
+          } catch {
+              return false;
+          }
+        });
+        
+        const stateHash_player1 = submitInitialStateEvent_player1 ? 
+            battleshipWaku.interface.parseLog(submitInitialStateEvent_player1).args.stateHash : 
+            null;
+
+        console.log("State hash submit initial state player 1", stateHash_player1);
+
+        const gameState_Player1 = await battleshipWaku.getGameState(stateHash_player1);
+        console.log("Game state:: Player 1", gameState_Player1);
+        
         const game2 = await gameStateChannel2.getGameState();
         const game_converted2 = {
           nonce: game2.nonce,
@@ -333,59 +346,210 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
           proofPlayer2_converted
         );
         const receiptSubmitInitialState_player2 = await txSubmitInitialState_player2.wait();
-        console.log("Submit initial state player 2 receipt", receiptSubmitInitialState_player2);
+        // console.log("Submit initial state player 2 receipt", receiptSubmitInitialState_player2);
+
+        const submitInitialStateEvent_player2 = receiptSubmitInitialState_player2.logs.find((log: any) => {
+          try {
+              const parsed = battleshipWaku.interface.parseLog(log);
+              return parsed?.name === 'InitialStateSubmitted';
+          } catch {
+              return false;
+          }
+        });
         
-        // // Create initial states with real commitments
-        // const initialState1 = createGameState({
-        // currentTurn: player1.address,
-        // player1ShipCommitment: hre.ethers.keccak256(hre.ethers.toUtf8Bytes(player1ShipProof.commitment))
-        // });
-        // const initialState2 = createGameState({
-        // currentTurn: player1.address,
-        // player2ShipCommitment: hre.ethers.keccak256(hre.ethers.toUtf8Bytes(player2ShipProof.commitment))
-        // });
+        const stateHash_player2 = submitInitialStateEvent_player2 ? 
+            battleshipWaku.interface.parseLog(submitInitialStateEvent_player2).args.stateHash : 
+            null;
 
-        // const signature1 = await signGameState(initialState1, player1);
-        // const signature2 = await signGameState(initialState2, player2);
+        console.log("StateHash submit initial state player 2", stateHash_player2);
+        
+        const gameState_Player2 = await battleshipWaku.getGameState(stateHash_player2);
+        console.log("Game state:: Player 2", gameState_Player2);
 
-        // // Both players submit initial states
-        // await expect(battleshipWaku.connect(player1).submitInitialState(1, initialState1, signature1, player1ShipProof))
-        // .to.emit(battleshipWaku, "InitialStateSubmitted")
-        // .withArgs(1, player1.address, hre.ethers.keccak256(hre.ethers.AbiCoder.defaultAbiCoder().encode(
-        //     ["tuple(bytes32,uint256,address,uint256,bytes32,bytes32,uint8,uint8,bool,address,uint256)"],
-        //     [[
-        //     initialState1.stateHash,
-        //     initialState1.nonce,
-        //     initialState1.currentTurn,
-        //     initialState1.moveCount,
-        //     initialState1.player1ShipCommitment,
-        //     initialState1.player2ShipCommitment,
-        //     initialState1.player1Hits,
-        //     initialState1.player2Hits,
-        //     initialState1.gameEnded,
-        //     initialState1.winner,
-        //     initialState1.timestamp
-        //     ]]
-        // )));
+        if (!fs.existsSync(wasmPath)) {
+            throw new Error(`WASM file not found at: ${wasmPath}`);
+        }
+        
+        if (!fs.existsSync(zkeyPath)) {
+            throw new Error(`zkey file not found at: ${zkeyPath}`);
+        }
+        if (!fs.existsSync(verificationKeyPath)) {
+            throw new Error(`verification file not found at: ${verificationKeyPath}`);
+        }
+        console.log("wasmPath", wasmPath);
+        console.log("zkeyPath", zkeyPath);
+        console.log("verificationKeyPath", verificationKeyPath);
 
-        // await expect(battleshipWaku.connect(player2).submitInitialState(1, initialState2, signature2, player2ShipProof))
-        // .to.emit(battleshipWaku, "InitialStateSubmitted")
-        // .withArgs(1, player2.address, hre.ethers.keccak256(hre.ethers.AbiCoder.defaultAbiCoder().encode(
-        //     ["tuple(bytes32,uint256,address,uint256,bytes32,bytes32,uint8,uint8,bool,address,uint256)"],
-        //     [[
-        //     initialState2.stateHash,
-        //     initialState2.nonce,
-        //     initialState2.currentTurn,
-        //     initialState2.moveCount,
-        //     initialState2.player1ShipCommitment,
-        //     initialState2.player2ShipCommitment,
-        //     initialState2.player1Hits,
-        //     initialState2.player2Hits,
-        //     initialState2.gameEnded,
-        //     initialState2.winner,
-        //     initialState2.timestamp
-        //     ]]
-        // ))).to.emit(battleshipWaku, "ChannelReady");
+        
+        console.log("--");
+
+        const moveWasmPath = path.join(__dirname, "..", "build", "move_verification", "move_verification_js", "move_verification.wasm");
+        const moveZkeyPath = path.join(__dirname, "..", "keys", "move_verification_final.zkey");
+        const moveVerificationKeyPath = path.join(__dirname, "..", "keys", "move_verification_key.json");
+        if (!fs.existsSync(moveWasmPath)) {
+          throw new Error(`WASM file not found at: ${moveWasmPath}`);
+        }
+        
+        if (!fs.existsSync(moveZkeyPath)) {
+            throw new Error(`zkey file not found at: ${moveZkeyPath}`);
+        }
+        if (!fs.existsSync(moveVerificationKeyPath)) {
+            throw new Error(`verification file not found at: ${moveVerificationKeyPath}`);
+        }
+        console.log("moveWasmPath", moveWasmPath);
+        console.log("zkemoveZkeyPathyPath", moveZkeyPath);
+
+        const moveVerification = JSON.parse(fs.readFileSync(moveVerificationKeyPath));
+    
+        const player1ShipPositions = gameStateChannel.calculateShipPositions(shipPositions1);
+        const player2ShipPositions = gameStateChannel.calculateShipPositions(shipPositions2);
+    
+        for (let i = 0; i < 12; i++) {
+          // Player 1 makes a move. This computation is done at the player2's end in the actual game.
+          console.log("Player 1 makes a move", i);
+          const guessPlayer1 = player2ShipPositions[i];
+          const hit = 1;
+          
+          const moveInputPlayer1 = {
+            salt: shipPlacementPositionsPlayer2.salt,
+            commitment: shipPlacementPositionsPlayer2.commitment,
+            merkle_root: shipPlacementPositionsPlayer2.merkle_root,
+            board_state: shipPlacementPositionsPlayer2.board_state,
+            guess_x: guessPlayer1[0],
+            guess_y: guessPlayer1[1],
+            hit: hit
+          };
+          // Player 2 generates the proof for the move made by Player 1
+          const {proof: _proofMovePlayer1, calldata: proofMovePlayer1} = await gameStateChannel2.generateProof(moveInputPlayer1, moveWasmPath, moveZkeyPath);
+          // console.log(proofPlayer1);
+          const proofMovePlayer1_converted = {
+            pA: proofMovePlayer1[0],
+            pB: proofMovePlayer1[1],
+            pC: proofMovePlayer1[2],
+            pubSignals: proofMovePlayer1[3]
+          };
+          // Player 2 verifies the proof generated by Player 1
+          let resultMovePlayer1 = await moveVerifier.verifyProof(proofMovePlayer1_converted.pA, proofMovePlayer1_converted.pB, proofMovePlayer1_converted.pC, proofMovePlayer1_converted.pubSignals);
+          console.log("Move verification proof player 1 at Player 2's side", resultMovePlayer1);
+
+          let offchainVerification = await gameStateChannel.verifyProof(moveVerification, _proofMovePlayer1);
+          console.log("Offchain move verification proof player 1 at Player 2's side", offchainVerification);
+
+          // If the move is valid, Player 2 acknowledges the move and shares the result back to Player 1
+          if(resultMovePlayer1 && offchainVerification) {
+            gameStateChannel.acknowledgeMove();
+            gameStateChannel2.acknowledgeMove();
+          }
+
+          // This is computed back at Player1's end.
+          let move_player1 = {
+            x: guessPlayer1[0],
+            y: guessPlayer1[1],
+            isHit: hit,
+            timestamp: Date.now()
+          };
+
+          // PLayer 1 checks gets to know if it's a hit or a miss and updates the state accordingly!
+          if(await gameStateChannel.isMyTurn()) {
+            let moveStatehash = await gameStateChannel.makeMove(move_player1);
+            console.log("Player1 current move state hash ", moveStatehash);
+          }
+          
+          // Player 2 makes a move. This computation is done at the player1's end in the actual game.
+          console.log("Player 2 makes a move", i);
+          const guessPlayer2 = player1ShipPositions[i];
+          const hit2 = 1;
+        
+          const moveInputPlayer2 = {
+            salt: shipPlacementPositionsPlayer1.salt,
+            commitment: shipPlacementPositionsPlayer1.commitment,
+            merkle_root: shipPlacementPositionsPlayer1.merkle_root,
+            board_state: shipPlacementPositionsPlayer1.board_state,
+            guess_x: guessPlayer2[0],
+            guess_y: guessPlayer2[1],
+            hit: hit2
+          };
+          // Player 1 generates the proof for the move made by Player 2
+          const {proof: _proofMovePlayer2, calldata: proofMovePlayer2} = await gameStateChannel.generateProof(moveInputPlayer2, moveWasmPath, moveZkeyPath);
+          // console.log(proofPlayer1);
+          const proofMovePlayer2_converted = {
+            pA: proofMovePlayer2[0],
+            pB: proofMovePlayer2[1],
+            pC: proofMovePlayer2[2],
+            pubSignals: proofMovePlayer2[3]
+          };
+        
+          let resultMovePlayer2 = await moveVerifier.verifyProof(proofMovePlayer2_converted.pA, proofMovePlayer2_converted.pB, proofMovePlayer2_converted.pC, proofMovePlayer2_converted.pubSignals);
+          console.log("Move verification proof player 2 at Player 1's side", resultMovePlayer2);
+          let offchainVerification2 = await gameStateChannel.verifyProof(moveVerification, _proofMovePlayer2);
+          console.log("Offchain move verification proof player 2 at Player 1's side", offchainVerification2);
+
+          // If the move is valid, Player 1 acknowledges the move and shares the result back to Player 2
+          if(resultMovePlayer2 && offchainVerification2) {
+            gameStateChannel.acknowledgeMove();
+            gameStateChannel2.acknowledgeMove();
+          }
+
+           // This is computed back at Player2's end.
+           let move_player2 = {
+            x: guessPlayer2[0],
+            y: guessPlayer2[1],
+            isHit: hit2,
+            timestamp: Date.now()
+          };
+
+          // PLayer 2 checks gets to know if it's a hit or a miss and updates the state accordingly!
+          if(await gameStateChannel2.isMyTurn()) {
+            let moveStatehash2 = await gameStateChannel2.makeMove(move_player2);
+            console.log("Player2 current move state hash ", moveStatehash2);
+          }
+        }
+        const winWasmPath = path.join(__dirname, "..", "build", "win_verification", "win_verification_js", "win_verification.wasm");
+        const winZkeyPath = path.join(__dirname, "..", "keys", "win_verification_final.zkey");
+        const winVerificationKeyPath = path.join(__dirname, "..", "keys", "win_verification_key.json");
+        const winVerification = JSON.parse(fs.readFileSync(winVerificationKeyPath));
+        if (!fs.existsSync(winWasmPath)) {
+          throw new Error(`WASM file not found at: ${winWasmPath}`);
+        }
+        
+        if (!fs.existsSync(winZkeyPath)) {
+            throw new Error(`zkey file not found at: ${winZkeyPath}`);
+        }
+
+        if(!winVerification) {
+          throw new Error(`Verification key not found at: ${winVerificationKeyPath}`);
+        }
+        console.log("winWasmPath", winWasmPath);
+        console.log("winZkeyPath", winZkeyPath);
+        console.log("winVerificationKeyPath", winVerificationKeyPath);
+    
+        // Win verification for Player 1
+        const winInputPlayer1 = {
+          salt: shipPlacementPositionsPlayer2.salt,
+          commitment: shipPlacementPositionsPlayer2.commitment,
+          merkle_root: shipPlacementPositionsPlayer2.merkle_root,
+          board_state: shipPlacementPositionsPlayer2.board_state,
+          hit_count: 12,
+          hits: player2ShipPositions,
+        }
+    
+        const {proof: _proofWinPlayer1, calldata: proofWinPlayer1} = await gameStateChannel.generateProof(winInputPlayer1, winWasmPath, winZkeyPath);
+        const proofWinPlayer1_converted = {
+          pA: proofWinPlayer1[0],
+          pB: proofWinPlayer1[1],
+          pC: proofWinPlayer1[2],
+          pubSignals: proofWinPlayer1[3]
+        }
+    
+        let resultWinPlayer1 = await winVerifier.verifyProof(proofWinPlayer1_converted.pA, proofWinPlayer1_converted.pB, proofWinPlayer1_converted.pC, proofWinPlayer1_converted.pubSignals);
+        console.log("resultWinPlayer1", resultWinPlayer1);
+        
+        let offchainVerificationWinPlayer1 = await gameStateChannel.verifyProof(winVerification, _proofWinPlayer1);
+        console.log("offchainVerificationWinPlayer1", offchainVerificationWinPlayer1);
+
+        console.log("Player 1 game state ", gameStateChannel.getGameState());
+        console.log("Player 2 game state ", gameStateChannel2.getGameState());
+        
     });
 
     // it("Should reject duplicate initial state submissions", async function () {
