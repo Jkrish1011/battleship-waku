@@ -403,11 +403,13 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
     
         const player1ShipPositions = gameStateChannel.calculateShipPositions(shipPositions1);
         const player2ShipPositions = gameStateChannel.calculateShipPositions(shipPositions2);
-    
+        let winnerDeclared = false;
+        let winner = "";
         for (let i = 0; i < 12; i++) {
           // Player 1 makes a move. This computation is done at the player2's end in the actual game.
           console.log("Player 1 makes a move", i);
           const guessPlayer1 = player2ShipPositions[i];
+          // All these computations are done by player 2.
           const hit = 1;
           
           const moveInputPlayer1 = {
@@ -435,12 +437,6 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
           let offchainVerification = await gameStateChannel.verifyProof(moveVerification, _proofMovePlayer1);
           console.log("Offchain move verification proof player 1 at Player 2's side", offchainVerification);
 
-          // If the move is valid, Player 2 acknowledges the move and shares the result back to Player 1
-          if(resultMovePlayer1 && offchainVerification) {
-            gameStateChannel.acknowledgeMove();
-            gameStateChannel2.acknowledgeMove();
-          }
-
           // This is computed back at Player1's end.
           let move_player1 = {
             x: guessPlayer1[0],
@@ -450,9 +446,30 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
           };
 
           // PLayer 1 checks gets to know if it's a hit or a miss and updates the state accordingly!
-          if(await gameStateChannel.isMyTurn()) {
-            let moveStatehash = await gameStateChannel.makeMove(move_player1);
+          const isMyTurn_player1 = await gameStateChannel.isMyTurn();
+          console.log("isMyTurn_player1", isMyTurn_player1);
+          
+          if(isMyTurn_player1) {
+            let {signature: moveStatehash, winnerFound: winnerFound1, winner: winner1} = await gameStateChannel.makeMove(move_player1);
             console.log("Player1 current move state hash ", moveStatehash);
+            if(winnerFound1) {
+                console.log("Game Over");
+                winnerDeclared = true;
+                winner = winner1;
+            }
+          }
+
+          // If the move is valid, Player 2 acknowledges the move and shares the result back to Player 1
+          if(resultMovePlayer1 && offchainVerification) {
+            gameStateChannel2.acknowledgeMove(hit);
+            gameStateChannel.switchTurn();
+            gameStateChannel2.switchTurn();
+          }
+
+          if(winnerDeclared) {
+            gameStateChannel.declareWinner(winner);
+            gameStateChannel2.declareWinner(winner);
+            break;
           }
           
           // Player 2 makes a move. This computation is done at the player1's end in the actual game.
@@ -484,12 +501,6 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
           let offchainVerification2 = await gameStateChannel.verifyProof(moveVerification, _proofMovePlayer2);
           console.log("Offchain move verification proof player 2 at Player 1's side", offchainVerification2);
 
-          // If the move is valid, Player 1 acknowledges the move and shares the result back to Player 2
-          if(resultMovePlayer2 && offchainVerification2) {
-            gameStateChannel.acknowledgeMove();
-            gameStateChannel2.acknowledgeMove();
-          }
-
            // This is computed back at Player2's end.
            let move_player2 = {
             x: guessPlayer2[0],
@@ -500,8 +511,28 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
 
           // PLayer 2 checks gets to know if it's a hit or a miss and updates the state accordingly!
           if(await gameStateChannel2.isMyTurn()) {
-            let moveStatehash2 = await gameStateChannel2.makeMove(move_player2);
+            let {signature: moveStatehash2, winnerFound: winnerFound2, winner: winner2} = await gameStateChannel2.makeMove(move_player2);
             console.log("Player2 current move state hash ", moveStatehash2);
+            if(winnerFound2) {
+                console.log("Game Over");
+                winnerDeclared = true;
+                winner = winner2;
+            }
+          }
+
+          
+          // If the move is valid, Player 1 acknowledges the move and shares the result back to Player 2
+          if(resultMovePlayer2 && offchainVerification2) {
+
+            gameStateChannel.acknowledgeMove(hit2);
+            gameStateChannel.switchTurn();
+            gameStateChannel2.switchTurn();
+          }
+
+          if(winnerDeclared) {
+            gameStateChannel.declareWinner(winner);
+            gameStateChannel2.declareWinner(winner);
+            break;
           }
         }
         const winWasmPath = path.join(__dirname, "..", "build", "win_verification", "win_verification_js", "win_verification.wasm");

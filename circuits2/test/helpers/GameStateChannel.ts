@@ -43,7 +43,7 @@ interface StateChannelMessage {
 interface Move {
     x: number;
     y: number;
-    isHit: boolean;
+    isHit: number;
     timestamp: number;
 }
 
@@ -72,40 +72,6 @@ interface GameState {
     player1: string;
     player2: string;
     localPlayerRole: 'initiator' | 'challenger';
-}
-
-interface ContractInteraction {
-    openChannel(player2: string): Promise<number>;
-    submitInitialState(
-        channelId: number,
-        initialState: GameState,
-        signature: string,
-        shipProof: ZKCalldataProof
-    ): Promise<void>;
-    
-    initiateDispute(
-        channelId: number,
-        disputeType: DisputeType,
-        challengedState: GameState,
-        signature1: string,
-        signature2: string
-    ): Promise<void>;
-    
-    respondToDispute(
-        disputeId: number,
-        counterState: GameState,
-        signature1: string,
-        signature2: string,
-        moveProofs: ZKCalldataProof[]
-    ): Promise<void>;
-    
-    settleChannel(
-        channelId: number,
-        finalState: GameState,
-        signature1: string,
-        signature2: string,
-        winProof: ZKCalldataProof
-    ): Promise<void>;
 }
 
 class GameStateChannelError extends Error {
@@ -317,25 +283,24 @@ export class GameStateChannel {
     // }
 
     async declareWinner(
-        winner: string,
-        winProof?: ZKCalldataProof
+        winner: string
     ): Promise<void> {
         if (!this.gameState) {
             throw new GameStateChannelError("Game state not initialized");
         }
 
-        if (this.gameState.winner) {
+        if (this.gameState.winner !== ethers.ZeroAddress) {
             throw new GameStateChannelError("Winner already declared");
         }
 
-         // Validate winner
-         if (winner !== this.gameState.player1 && winner !== this.gameState.player2) {
+        // Validate winner
+        if (winner !== this.gameState.player1 && winner !== this.gameState.player2) {
             throw new GameStateChannelError("Invalid winner");
         }
 
         // validate hits
         const winnerHits = winner === this.gameState.player1 ? this.gameState.player1Hits : this.gameState.player2Hits;
-        if (winnerHits < 17) {
+        if (winnerHits < 12) {
             throw new GameStateChannelError("Winner has not hit enough ships");
         }
 
@@ -532,13 +497,13 @@ export class GameStateChannel {
     }
 
     private async handleMoveMessage(message: StateChannelMessage): Promise<void> {
-        const { player, move } = message.data;
-        await this.makeMove(player, move);
+        const { move } = message.data;
+        await this.makeMove(move);
     }
 
     private async handleWinClaimMessage(message: StateChannelMessage): Promise<void> {
-        const { winner, winProof } = message.data;
-        await this.declareWinner(winner, winProof);
+        const { winner } = message.data;
+        await this.declareWinner(winner);
     }
 
     private async handleDisputeMessage(message: StateChannelMessage): Promise<void> {
@@ -947,7 +912,11 @@ export class GameStateChannel {
         }
 
         const myAddress = await this.signer.getAddress();
-        return this.gameState.currentTurn === myAddress;
+        console.log("Derived address is ", myAddress);
+        console.log("Current turn is ", this.gameState.currentTurn);
+        const res = this.gameState.currentTurn === myAddress;
+        console.log("result ", res);
+        return res;
     }
     
     async createGame(
@@ -984,7 +953,7 @@ export class GameStateChannel {
             this.gameState.localPlayerRole = (await this.signer?.getAddress()) === player1 ? "initiator" : "challenger";
 
             const signature = await this.signGameState(this.chainId, this.contractAddress);
-            // this.gameState.stateHash = this.computeStateHash();
+            this.gameState.stateHash = signature;
             this.emit('gameCreated', this.gameState);
             console.log("signature", signature)
             return signature;
@@ -994,7 +963,8 @@ export class GameStateChannel {
         }
     }
 
-    acknowledgeMove(): boolean {
+    // This function is called to self-update the hit or miss of the opponent and to switch turns
+    acknowledgeMove(isHit: number): boolean {
         if (!this.gameState) {
             throw new GameStateChannelError("Game state not initialized!");
         }
@@ -1003,13 +973,16 @@ export class GameStateChannel {
             throw new InvalidMoveError("Game is already finished");
         }
     
-        if (this.gameState.winner != ethers.ZeroAddress) {
-            throw new InvalidMoveError("Game is already finished");
+        if (this.gameState.winner !== ethers.ZeroAddress) {
+            throw new InvalidMoveError("Winner already declared");
         }
     
         try{
-            this.gameState.currentTurn = this.gameState.currentTurn === this.gameState.player1 ? this.gameState.player2 : this.gameState.player1;
-            this.emit('moveAcknowledged', { nextTurn: this.gameState.currentTurn, gameState: this.gameState });
+            if(isHit === 1 && this.gameState.currentTurn === this.gameState.player1) {
+                this.gameState.player1Hits++;
+            }else if(isHit === 1 && this.gameState.currentTurn === this.gameState.player2) {
+                this.gameState.player2Hits++;
+            }
             return true;
         }catch(err){
             console.error(err);
@@ -1017,9 +990,31 @@ export class GameStateChannel {
         }
     }
 
+    switchTurn() : void {
+        if (!this.gameState) {
+            throw new GameStateChannelError("Game state not initialized!");
+        }
+    
+        if (this.gameState.gameEnded) { 
+            throw new InvalidMoveError("Game is already finished");
+        }
+    
+        if (this.gameState.winner !== ethers.ZeroAddress) {
+            throw new InvalidMoveError("Winner already declared");
+        }
+    
+        try{
+            this.gameState.currentTurn = this.gameState.currentTurn === this.gameState.player1 ? this.gameState.player2 : this.gameState.player1;
+            this.emit('switched turns', { nextTurn: this.gameState.currentTurn, gameState: this.gameState });
+        }catch(err){
+            console.error(err);
+        }
+    }
+
     async makeMove(
         move: Move
-    ): Promise<string> {
+    ): Promise<{signature: string, winnerFound: boolean, winner: string}> {
+        let winnerFound = false, winner = ethers.ZeroAddress;
         if (!this.gameState) {
             throw new GameStateChannelError("Game state not initialized!");
         }
@@ -1028,16 +1023,12 @@ export class GameStateChannel {
             throw new InvalidMoveError("Game is already finished");
         }
     
-        // if (this.gameState.currentTurn !== player) {
-        //     throw new InvalidMoveError("Not your turn");
-        // }
-
-        if(this.gameState.currentTurn === (this.gameState.localPlayerRole === "initiator" ? this.gameState.player1 : this.gameState.player2)) {
+        if(this.gameState.currentTurn !== (this.gameState.localPlayerRole === "initiator" ? this.gameState.player1 : this.gameState.player2)) {
             throw new InvalidMoveError("Not your turn");
         }
     
-        if (this.gameState.winner != ethers.ZeroAddress) {
-            throw new InvalidMoveError("Game is already finished");
+        if (this.gameState.winner !== ethers.ZeroAddress) {
+            throw new InvalidMoveError("Winner already declared");
         }
         
         try{
@@ -1049,31 +1040,37 @@ export class GameStateChannel {
             this.gameState.nonce++;
             this.gameState.moveCount++; 
             
-            if (move.isHit) {
+            if (move.isHit === 1) {
+                console.log("it's a hit!");
                 if (this.gameState.currentTurn === this.gameState.player1) {
+                    console.log("player 1 hits");
                     this.gameState.player1Hits++;
                 } else {
+                    console.log("player 2 hits");
                     this.gameState.player2Hits++;
+                    
                 }
             }
         
-            // Switch turns
-            console.log("Current Turn ", this.gameState.currentTurn);
-            this.gameState.currentTurn = this.gameState.currentTurn === this.gameState.player1 ? this.gameState.player2 : this.gameState.player1;
+            // // Switch turns
+            // console.log("Current Turn ", this.gameState.currentTurn);
+            // this.gameState.currentTurn = this.gameState.currentTurn === this.gameState.player1 ? this.gameState.player2 : this.gameState.player1;
+            // console.log("Updated Current Turn ", this.gameState.currentTurn);
         
             const signature = await this.signGameState(this.chainId, this.contractAddress);
+            this.gameState.stateHash = signature;
             this.emit('moveMade', { playerRole: this.gameState.localPlayerRole , move, gameState: this.gameState });
         
-            // Check for win condition (17 total ship cells)
-            if (this.gameState.player1Hits === 17 || this.gameState.player2Hits === 17) {
-                const winner = this.gameState.player1Hits === 17 ? this.gameState.player1 : this.gameState.player2;
-                await this.declareWinner(winner);
+            // Check for win condition (12 total ship cells)
+            if (this.gameState.player1Hits === 12 || this.gameState.player2Hits === 12) {
+                winnerFound = true;
+                winner = this.gameState.currentTurn;
             }
         
-            return signature;
+            return {signature, winnerFound, winner};
         }catch(error) {
             console.error(error);
-            return "";
+            return {signature: "", winnerFound: false, winner: ethers.ZeroAddress};
         }
        
     }
