@@ -188,7 +188,7 @@ contract BattleshipStateChannel is Initializable, OwnableUpgradeable, UUPSUpgrad
         GameState memory toState,
         MoveProof[] calldata moveProofs
     ) internal pure returns (bool) {
-        if (toState.nonce <= fromState.nonce) {
+        if (toState.nonce >= fromState.nonce) {
             return false;
         }
 

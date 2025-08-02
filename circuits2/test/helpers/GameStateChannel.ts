@@ -47,6 +47,13 @@ interface Move {
     timestamp: number;
 }
 
+interface MovesData {
+    move: Move;
+    signature: string;
+    gameState: GameState;
+    gameStateHash: string;
+}
+
 interface SignatureResponse {
     message: string;
     signature: string;
@@ -54,7 +61,7 @@ interface SignatureResponse {
 }
 
 interface GameState {
-    stateHash:       string;   // bytes32 (optional caching)
+    stateHash?:       string;   // bytes32 (optional caching)
     nonce:           number;
     currentTurn:     string;   // address
     moveCount:       number;   // uint256
@@ -72,6 +79,7 @@ interface GameState {
     player1: string;
     player2: string;
     localPlayerRole: 'initiator' | 'challenger';
+    movesData: MovesData[];
 }
 
 class GameStateChannelError extends Error {
@@ -108,6 +116,7 @@ export class GameStateChannel {
 
     constructor(wakuRoomId: string, signer: ethers.Signer, chainId: number, contractAddress: string, localPlayerRole: 'initiator' | 'challenger') {
         this.gameState = {
+            // This field would be the latest statehash of the game. Will be updated post every move.
             stateHash: "",
             nonce: 0,
             currentTurn: "",
@@ -123,7 +132,8 @@ export class GameStateChannel {
             player1: "",
             player2: "",
             winner: ethers.ZeroAddress,
-            localPlayerRole: localPlayerRole
+            localPlayerRole: localPlayerRole,
+            movesData: []
         };
         this.signer = signer;
         this.poseidon = null;
@@ -181,28 +191,6 @@ export class GameStateChannel {
 
     //     return combinedHash;
     // }
-
-    static createShipPlacementCommitment(
-        boardData: number[][],
-        salt: string
-    ): string {
-        
-        const flatBoard = boardData.flat();
-
-        const abiCoder = new AbiCoder();
-        const commitment = abiCoder.encode(['uint8[100]', 'bytes32'], [ flatBoard, ethers.keccak256(ethers.toUtf8Bytes(salt)) ]);
-        return ethers.keccak256(commitment);
-    }
-
-    // Helper method to verify commitment matches board data
-    static verifyShipPlacementCommitment(
-        commitment: string,
-        boardData: number[][],
-        salt: string
-    ): boolean {
-        const expectedCommitment = GameStateChannel.createShipPlacementCommitment(boardData, salt);
-        return commitment === expectedCommitment;
-    }
 
     private async computeStateHash(chainId: number, contractAddress: string): Promise<string> {
         if (!this.gameState) throw new GameStateChannelError("Game state not initialized");
@@ -281,6 +269,26 @@ export class GameStateChannel {
         
     //     return true;
     // }
+
+    async updateMoves(movesData: MovesData) : Promise<void> {
+        if (!this.gameState) {
+            throw new GameStateChannelError("Game state not initialized");
+        }
+
+        if (this.gameState.winner !== ethers.ZeroAddress) {
+            throw new GameStateChannelError("Winner already declared");
+        }
+
+        if (this.gameState.gameEnded) {
+            throw new GameStateChannelError("Game already ended");
+        }
+
+        try{
+            this.gameState.movesData.push(movesData);
+        }catch(err){
+            throw new Error("Failed to update moves");
+        }
+    }
 
     async declareWinner(
         winner: string
