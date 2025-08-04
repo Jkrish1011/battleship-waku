@@ -188,7 +188,7 @@ contract BattleshipStateChannel is Initializable, OwnableUpgradeable, UUPSUpgrad
         GameState memory toState,
         MoveProof[] calldata moveProofs
     ) internal pure returns (bool) {
-        if (toState.nonce <= fromState.nonce) {
+        if (toState.nonce >= fromState.nonce) {
             return false;
         }
 
@@ -479,7 +479,7 @@ contract BattleshipStateChannel is Initializable, OwnableUpgradeable, UUPSUpgrad
 
     function claimTimeout(uint256 channelId) external {
         Channel storage channel = channels[channelId];
-        require(channel.status == ChannelStatus.Open, "Channel not open!");
+        require(channel.status != ChannelStatus.Settled, "Channel already settled!");
         require(msg.sender == channel.player1 || msg.sender == channel.player2, "Not a player");
         require(block.timestamp > channel.openedAt + CHALLENGE_PERIOD * 7, "Challenge period not over");
 
