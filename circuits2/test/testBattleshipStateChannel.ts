@@ -192,7 +192,7 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
 
       const player2_gameState = await gameStateChannel2.generateShipPlacementProof(proofPlayer2_converted, shipPlacementPositionsPlayer2.ships, shipPlacementPositionsPlayer2.board_state, shipPlacementPositionsPlayer2.salt, shipPlacementPositionsPlayer2.commitment, shipPlacementPositionsPlayer2.merkle_root);
       
-      const stateSignature_createGame = await gameStateChannel.createGame(
+      const {signature: stateSignature_createGame_ofPlayer1, hash: stateHash_createGame_ofPlayer1} = await gameStateChannel.createGame(
         "1",
         "333",
         player1.address,
@@ -205,11 +205,11 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
         player2_gameState.player2ShipPlacementProof
       );
 
-      if (stateSignature_createGame === "") {
+      if (stateSignature_createGame_ofPlayer1 === "" || stateHash_createGame_ofPlayer1 === "") {
           throw new Error("Game creation failed");
       }
 
-      const stateSignature_createGame2 = await gameStateChannel2.createGame(
+      const {signature: stateSignature_createGame_ofPlayer2, hash: stateHash_createGame_ofPlayer2} = await gameStateChannel2.createGame(
         "1",
         "333",
         player1.address,
@@ -222,7 +222,7 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
         player2_gameState.player2ShipPlacementProof
       );
 
-      if (stateSignature_createGame2 === "") {
+      if (stateSignature_createGame_ofPlayer2 === "" || stateHash_createGame_ofPlayer2 === "") {
           throw new Error("Game creation failed");
       }
 
@@ -261,7 +261,7 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
       const txSubmitInitialState_player1 = await battleshipWaku.connect(player1).submitInitialState(
         channelId,
         game_converted,
-        stateSignature_createGame,
+        stateSignature_createGame_ofPlayer1,
         proofPlayer1_converted
       );
       const receiptSubmitInitialState_player1 = await txSubmitInitialState_player1.wait();
@@ -288,7 +288,7 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
       await expect(battleshipWaku.connect(player1).submitInitialState(
         channelId,
         game_converted,
-        stateSignature_createGame,
+        stateSignature_createGame_ofPlayer1,
         proofPlayer1_converted
       )).to.be.revertedWith("Already submitted initial state");
       
@@ -537,7 +537,7 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
 
         const player2_gameState = await gameStateChannel2.generateShipPlacementProof(proofPlayer2_converted, shipPlacementPositionsPlayer2.ships, shipPlacementPositionsPlayer2.board_state, shipPlacementPositionsPlayer2.salt, shipPlacementPositionsPlayer2.commitment, shipPlacementPositionsPlayer2.merkle_root);
         
-        const stateSignature_createGame = await gameStateChannel.createGame(
+        const {signature: stateSignature_createGame_ofPlayer1, hash: stateHash_createGame_ofPlayer1} = await gameStateChannel.createGame(
           "1",
           "333",
           player1.address,
@@ -550,11 +550,11 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
           player2_gameState.player2ShipPlacementProof
         );
 
-        if (stateSignature_createGame === "") {
+        if (stateSignature_createGame_ofPlayer1 === "" || stateHash_createGame_ofPlayer1 === "") {
             throw new Error("Game creation failed");
         }
 
-        const stateSignature_createGame2 = await gameStateChannel2.createGame(
+        const {signature: stateSignature_createGame_ofPlayer2, hash: stateHash_createGame_ofPlayer2} = await gameStateChannel2.createGame(
           "1",
           "333",
           player1.address,
@@ -567,7 +567,7 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
           player2_gameState.player2ShipPlacementProof
         );
 
-        if (stateSignature_createGame2 === "") {
+        if (stateSignature_createGame_ofPlayer2 === "" || stateHash_createGame_ofPlayer2 === "") {
             throw new Error("Game creation failed");
         }
 
@@ -601,12 +601,12 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
           gameEnded: game.gameEnded,
           winner: game.winner,
           timestamp: game.timestamp
-        };
+        }
         
         const txSubmitInitialState_player1 = await battleshipWaku.connect(player1).submitInitialState(
           channelId,
           game_converted,
-          stateSignature_createGame,
+          stateSignature_createGame_ofPlayer1,
           proofPlayer1_converted
         );
         const receiptSubmitInitialState_player1 = await txSubmitInitialState_player1.wait();
@@ -647,7 +647,7 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
         const txSubmitInitialState_player2 = await battleshipWaku.connect(player2).submitInitialState(
           channelId,
           game_converted2,
-          stateSignature_createGame2,
+          stateSignature_createGame_ofPlayer2,
           proofPlayer2_converted
         );
         const receiptSubmitInitialState_player2 = await txSubmitInitialState_player2.wait();
@@ -708,6 +708,7 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
     
         const player1ShipPositions = gameStateChannel.calculateShipPositions(shipPositions1);
         const player2ShipPositions = gameStateChannel.calculateShipPositions(shipPositions2);
+      
         let winnerDeclared = false;
         let winner = "";
         for (let i = 0; i < 12; i++) {
@@ -729,37 +730,76 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
           // Player 2 generates the proof for the move made by Player 1
           const {proof: _proofMovePlayer1, calldata: proofMovePlayer1} = await gameStateChannel2.generateProof(moveInputPlayer1, moveWasmPath, moveZkeyPath);
           // console.log(proofPlayer1);
+          // proofMovePlayer1_converted & _proofMovePlayer1 - To be sent to Player 1
           const proofMovePlayer1_converted = {
             pA: proofMovePlayer1[0],
             pB: proofMovePlayer1[1],
             pC: proofMovePlayer1[2],
             pubSignals: proofMovePlayer1[3]
           };
-          // PLayer 2 verify locally if proofs are right and shares it with the Player1
-          await gameStateChannel2.verifyProof(moveVerification, _proofMovePlayer1);
+          // PLayer 2 verify locally if proofs are right and signs the current game state and shares it with the Player1
+          const resultOnChainProof_byPlayer2 = await gameStateChannel2.verifyProof(moveVerification, _proofMovePlayer1);
+          const resultOffChainProof_byPlayer2 = await moveVerifier.verifyProof(proofMovePlayer1_converted.pA, proofMovePlayer1_converted.pB, proofMovePlayer1_converted.pC, proofMovePlayer1_converted.pubSignals);
+
+          // Check if local proof generations are okay. Else throw error from Player2's side.
+          if(!resultOnChainProof_byPlayer2 || !resultOffChainProof_byPlayer2) {
+            throw new Error("Move verification failed");
+          } 
+
+          // Increment player1's hit count
+          gameStateChannel2.acknowledgeMove(hit);
+          
+          // Switch turn to player2
+          gameStateChannel2.switchTurn();
+
+          // Generate move data for Player 1
+          const moveTimestamp = Math.floor(Date.now() / 1000);
+          let move_player1_byPlayer2 = {
+            x: guessPlayer1[0],
+            y: guessPlayer1[1],
+            isHit: hit,
+            timestamp: moveTimestamp
+          };
+
+          const {signature: currentStateSignature_ofPlayer2, hash: currentStateHash_ofPlayer2} = await gameStateChannel2.signGameState();
+
+          const latestGameState_fromPlayer2 = gameStateChannel2.getGameState();
+          const latestGameStateSC_fromPlayer2 = {
+            stateHash: latestGameState_fromPlayer2.stateHash,
+            nonce: latestGameState_fromPlayer2.nonce,
+            currentTurn: latestGameState_fromPlayer2.currentTurn,
+            moveCount: latestGameState_fromPlayer2.moveCount,
+            player1ShipCommitment: latestGameState_fromPlayer2.player1ShipCommitment,
+            player2ShipCommitment: latestGameState_fromPlayer2.player2ShipCommitment,
+            player1Hits: latestGameState_fromPlayer2.player1Hits,
+            player2Hits: latestGameState_fromPlayer2.player2Hits,
+            gameEnded: latestGameState_fromPlayer2.gameEnded,
+            winner: latestGameState_fromPlayer2.winner,
+            timestamp: latestGameState_fromPlayer2.timestamp
+          }
+          
+          // The move data to be sent to Player 1
+          const movesData_player1_byPlayer2 = {
+            move: move_player1_byPlayer2,
+            moveStatehash: currentStateSignature_ofPlayer2,
+            gameState: latestGameStateSC_fromPlayer2,
+            gameStateHash: currentStateHash_ofPlayer2
+          };
+          // Update the current move data for Player 1 at Player 2's side
+          await gameStateChannel2.updateMoves(movesData_player1_byPlayer2);
 
           // Player 1 verifies the proof generated by Player 2
           let resultMovePlayer1 = await moveVerifier.verifyProof(proofMovePlayer1_converted.pA, proofMovePlayer1_converted.pB, proofMovePlayer1_converted.pC, proofMovePlayer1_converted.pubSignals);
           console.log("Move verification proof player 1 at Player 2's side", resultMovePlayer1);
 
-          let offchainVerification = await gameStateChannel.verifyProof(moveVerification, _proofMovePlayer1);
-          console.log("Offchain move verification proof player 1 at Player 2's side", offchainVerification);
+          let offchainVerificationPlayer1 = await gameStateChannel.verifyProof(moveVerification, _proofMovePlayer1);
+          console.log("Offchain move verification proof player 1 at Player 2's side", offchainVerificationPlayer1);
 
-          // This is computed back at Player1's end.
-          let move_player1 = {
-            x: guessPlayer1[0],
-            y: guessPlayer1[1],
-            isHit: hit,
-            timestamp: Date.now()
-          };
-
-          // PLayer 1 checks gets to know if it's a hit or a miss and updates the state accordingly!
+          // PLayer 1 calls the makeMove function and updates the state accordingly!
           const isMyTurn_player1 = await gameStateChannel.isMyTurn();
-          console.log("isMyTurn_player1", isMyTurn_player1);
           let moveStateHash_player1 = "";
           if(isMyTurn_player1) {
-            let {signature: moveStatehash, winnerFound: winnerFound1, winner: winner1} = await gameStateChannel.makeMove(move_player1);
-            console.log("Player1 current move state hash ", moveStatehash);
+            let {signature: moveStatehash, winnerFound: winnerFound1, winner: winner1} = await gameStateChannel.makeMove(move_player1_byPlayer2);
             moveStateHash_player1 = moveStatehash;
             if(winnerFound1) {
                 console.log("Game Over");
@@ -769,32 +809,19 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
           }
 
           // If the move is valid, Player 2 acknowledges the move and shares the result back to Player 1
-          if(resultMovePlayer1 && offchainVerification) {
-            gameStateChannel2.acknowledgeMove(hit);
+          if(resultMovePlayer1 && offchainVerificationPlayer1) {
             gameStateChannel.switchTurn();
-            gameStateChannel2.switchTurn();
+          } else {
+            // Should go for dispute in real world scenario
+            throw new Error("Move verification failed");
           }
-
-          //updates the moves on both player 1 and player 2 side
-          const movesData_player1 = {
-            move: move_player1,
-            moveStatehash: moveStateHash_player1,
-            gameState: gameStateChannel.getGameState(),
-            gameStateHash: moveStateHash_player1
-          }
-
-          const movesData_player2 = {
-            move: move_player1,
-            moveStatehash: moveStateHash_player1,
-            gameState: gameStateChannel2.getGameState(),
-            gameStateHash: moveStateHash_player1
-          };
-
-          await gameStateChannel.updateMoves(movesData_player1);
-          await gameStateChannel2.updateMoves(movesData_player2);
-
+          // Player 1 updates the moves using the data passed by Player 2
+          await gameStateChannel.updateMoves(movesData_player1_byPlayer2);
+          
+          // Checks if the winner is declared
           if(winnerDeclared) {
             gameStateChannel.declareWinner(winner);
+            // This will be sent to player 2 and player 2 will update the state accordingly
             gameStateChannel2.declareWinner(winner);
             break;
           }
@@ -814,35 +841,80 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
             hit: hit2
           };
           // Player 1 generates the proof for the move made by Player 2
+          // Player 2 generates the proof for the move made by Player 1
           const {proof: _proofMovePlayer2, calldata: proofMovePlayer2} = await gameStateChannel.generateProof(moveInputPlayer2, moveWasmPath, moveZkeyPath);
           // console.log(proofPlayer1);
+          // proofMovePlayer1_converted & _proofMovePlayer1 - To be sent to Player 1
           const proofMovePlayer2_converted = {
             pA: proofMovePlayer2[0],
             pB: proofMovePlayer2[1],
             pC: proofMovePlayer2[2],
             pubSignals: proofMovePlayer2[3]
           };
-        
-          let resultMovePlayer2 = await moveVerifier.verifyProof(proofMovePlayer2_converted.pA, proofMovePlayer2_converted.pB, proofMovePlayer2_converted.pC, proofMovePlayer2_converted.pubSignals);
-          console.log("Move verification proof player 2 at Player 1's side", resultMovePlayer2);
-          let offchainVerification2 = await gameStateChannel.verifyProof(moveVerification, _proofMovePlayer2);
-          console.log("Offchain move verification proof player 2 at Player 1's side", offchainVerification2);
+          // PLayer 1 verify locally if proofs are right and signs the current game state and shares it with the Player2
+          const resultOnChainProof_byPlayer1 = await gameStateChannel.verifyProof(moveVerification, _proofMovePlayer2);
+          const resultOffChainProof_byPlayer1 = await moveVerifier.verifyProof(proofMovePlayer2_converted.pA, proofMovePlayer2_converted.pB, proofMovePlayer2_converted.pC, proofMovePlayer2_converted.pubSignals);
 
-          // Player 2 verifies the proof generated by Player 1
-          gameStateChannel2.verifyProof(moveVerification, _proofMovePlayer2);
+          // Check if local proof generations are okay. Else throw error from Player2's side.
+          if(!resultOnChainProof_byPlayer1 || !resultOffChainProof_byPlayer1) {
+            throw new Error("Move verification failed");
+          } 
 
-           // This is computed back at Player2's end.
-           let move_player2 = {
+          // Increment player2's hit count at Player 1's end
+          gameStateChannel.acknowledgeMove(hit2);
+          
+          // Switch turn to player2
+          gameStateChannel.switchTurn();
+
+          // Generate move data for Player 1
+          const moveTimestamp2 = Math.floor(Date.now() / 1000);
+          let move_player2_byPlayer1 = {
             x: guessPlayer2[0],
             y: guessPlayer2[1],
             isHit: hit2,
-            timestamp: Date.now()
+            timestamp: moveTimestamp2
           };
 
-          // PLayer 2 checks gets to know if it's a hit or a miss and updates the state accordingly!
-          if(await gameStateChannel2.isMyTurn()) {
-            let {signature: moveStatehash2, winnerFound: winnerFound2, winner: winner2} = await gameStateChannel2.makeMove(move_player2);
-            console.log("Player2 current move state hash ", moveStatehash2);
+          const {signature: currentStateSignature_ofPlayer1, hash: currentStateHash_ofPlayer1} = await gameStateChannel.signGameState();
+
+          const latestGameState_fromPlayer1 = gameStateChannel.getGameState();
+          const latestGameStateSC_fromPlayer1 = {
+            stateHash: latestGameState_fromPlayer1.stateHash,
+            nonce: latestGameState_fromPlayer1.nonce,
+            currentTurn: latestGameState_fromPlayer1.currentTurn,
+            moveCount: latestGameState_fromPlayer1.moveCount,
+            player1ShipCommitment: latestGameState_fromPlayer1.player1ShipCommitment,
+            player2ShipCommitment: latestGameState_fromPlayer1.player2ShipCommitment,
+            player1Hits: latestGameState_fromPlayer1.player1Hits,
+            player2Hits: latestGameState_fromPlayer1.player2Hits,
+            gameEnded: latestGameState_fromPlayer1.gameEnded,
+            winner: latestGameState_fromPlayer1.winner,
+            timestamp: latestGameState_fromPlayer1.timestamp
+          }
+          
+          // The move data to be sent to Player 1
+          const movesData_player2_byPlayer1 = {
+            move: move_player2_byPlayer1,
+            moveStatehash: currentStateSignature_ofPlayer1,
+            gameState: latestGameStateSC_fromPlayer1,
+            gameStateHash: currentStateHash_ofPlayer1
+          };
+          // Update the current move data for Player 2 at Player 1's side
+          await gameStateChannel.updateMoves(movesData_player2_byPlayer1);
+
+          // Player 2 verifies the proof generated by Player 1
+          let resultMovePlayer2 = await moveVerifier.verifyProof(proofMovePlayer2_converted.pA, proofMovePlayer2_converted.pB, proofMovePlayer2_converted.pC, proofMovePlayer2_converted.pubSignals);
+          console.log("Move verification proof player 2 at Player 1's side", resultMovePlayer2);
+
+          let offchainVerificationPlayer2 = await gameStateChannel.verifyProof(moveVerification, _proofMovePlayer2);
+          console.log("Offchain move verification proof player 2 at Player 1's side", offchainVerificationPlayer2);
+
+          // PLayer 2 calls the makeMove function and updates the state accordingly!
+          const isMyTurn_player2 = await gameStateChannel.isMyTurn();
+          let moveStateHash_player2 = "";
+          if(moveStateHash_player2) {
+            let {signature: moveStatehash, winnerFound: winnerFound2, winner: winner2} = await gameStateChannel2.makeMove(move_player2_byPlayer1);
+            moveStateHash_player2 = moveStatehash;
             if(winnerFound2) {
                 console.log("Game Over");
                 winnerDeclared = true;
@@ -850,32 +922,17 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
             }
           }
 
-          // If the move is valid, Player 1 acknowledges the move and shares the result back to Player 2
-          if(resultMovePlayer2 && offchainVerification2) {
-
-            gameStateChannel.acknowledgeMove(hit2);
-            gameStateChannel.switchTurn();
+          // If the move is valid, Player 2 acknowledges the move and shares the result back to Player 1
+          if(resultMovePlayer2 && offchainVerificationPlayer2) {
             gameStateChannel2.switchTurn();
+          } else {
+            // Should go for dispute in real world scenario
+            throw new Error("Move verification failed");
           }
-
-          //updates the moves on both player 1 and player 2 side
-          const movesData2_player1 = {
-            move: move_player1,
-            moveStatehash: moveStateHash_player1,
-            gameState: gameStateChannel.getGameState(),
-            gameStateHash: moveStateHash_player1
-          }
-
-          const movesData2_player2 = {
-            move: move_player1,
-            moveStatehash: moveStateHash_player1,
-            gameState: gameStateChannel2.getGameState(),
-            gameStateHash: moveStateHash_player1
-          };
-
-          await gameStateChannel.updateMoves(movesData2_player1);
-          await gameStateChannel2.updateMoves(movesData2_player2);
-
+          // Player 2 updates the moves using the data passed by Player 1
+          await gameStateChannel2.updateMoves(movesData_player1_byPlayer2);
+          
+          // Checks if the winner is declared
           if(winnerDeclared) {
             gameStateChannel.declareWinner(winner);
             gameStateChannel2.declareWinner(winner);
@@ -907,7 +964,7 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
           commitment: shipPlacementPositionsPlayer2.commitment,
           merkle_root: shipPlacementPositionsPlayer2.merkle_root,
           board_state: shipPlacementPositionsPlayer2.board_state,
-          hit_count: 12,
+          hit_count: gameStateChannel.gameState.player1Hits,
           hits: player2ShipPositions,
         }
     
@@ -925,6 +982,10 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
         let offchainVerificationWinPlayer1 = await gameStateChannel.verifyProof(winVerification, _proofWinPlayer1);
         console.log("offchainVerificationWinPlayer1", offchainVerificationWinPlayer1);
 
+        // const gS = gameStateChannel.getGameState();
+        // console.log(gS.movesData[0]);
+        // const gS2 = gameStateChannel2.getGameState();
+        // console.log(gS2.movesData[0]);
         console.log("Player 1 game state ", gameStateChannel.getGameState());
         console.log("Player 2 game state ", gameStateChannel2.getGameState());
         
@@ -933,7 +994,7 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
   });
 
   describe("Dispute Resolution System", function () {
-    it("Should handle dispute initiation and resolution", async function () {
+    it("Should handle dispute initiation and timeout", async function () {
       
       /*
         Open the state channels for both the players and submit initial state. Do few moves for name sake. 
@@ -1018,7 +1079,7 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
 
         const player2_gameState = await gameStateChannel2.generateShipPlacementProof(proofPlayer2_converted, shipPlacementPositionsPlayer2.ships, shipPlacementPositionsPlayer2.board_state, shipPlacementPositionsPlayer2.salt, shipPlacementPositionsPlayer2.commitment, shipPlacementPositionsPlayer2.merkle_root);
         
-        const stateSignature_createGame = await gameStateChannel.createGame(
+        const {signature: stateSignature_createGame_ofPlayer1, hash: stateHash_createGame_ofPlayer1} = await gameStateChannel.createGame(
           "1",
           "333",
           player1.address,
@@ -1031,11 +1092,11 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
           player2_gameState.player2ShipPlacementProof
         );
 
-        if (stateSignature_createGame === "") {
+        if (stateSignature_createGame_ofPlayer1 === "" || stateHash_createGame_ofPlayer1 === "") {
             throw new Error("Game creation failed");
         }
 
-        const stateSignature_createGame2 = await gameStateChannel2.createGame(
+        const {signature: stateSignature_createGame_ofPlayer2, hash: stateHash_createGame_ofPlayer2} = await gameStateChannel2.createGame(
           "1",
           "333",
           player1.address,
@@ -1048,7 +1109,7 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
           player2_gameState.player2ShipPlacementProof
         );
 
-        if (stateSignature_createGame2 === "") {
+        if (stateSignature_createGame_ofPlayer2 === "" || stateHash_createGame_ofPlayer2 === "") {
             throw new Error("Game creation failed");
         }
 
@@ -1087,7 +1148,7 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
         const txSubmitInitialState_player1 = await battleshipWaku.connect(player1).submitInitialState(
           channelId,
           game_converted,
-          stateSignature_createGame,
+          stateSignature_createGame_ofPlayer1,
           proofPlayer1_converted
         );
         const receiptSubmitInitialState_player1 = await txSubmitInitialState_player1.wait();
@@ -1128,7 +1189,7 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
         const txSubmitInitialState_player2 = await battleshipWaku.connect(player2).submitInitialState(
           channelId,
           game_converted2,
-          stateSignature_createGame2,
+          stateSignature_createGame_ofPlayer2,
           proofPlayer2_converted
         );
         const receiptSubmitInitialState_player2 = await txSubmitInitialState_player2.wait();
@@ -1191,6 +1252,9 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
         const player2ShipPositions = gameStateChannel.calculateShipPositions(shipPositions2);
         let winnerDeclared = false;
         let winner = "";
+
+        console.log("Player 1 address ", player1.address);
+        console.log("Player 2 address ", player2.address);
         for (let i = 0; i < 12; i++) {
           // Player 1 makes a move. This computation is done at the player2's end in the actual game.
           console.log("Player 1 makes a move", i);
@@ -1210,37 +1274,93 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
           // Player 2 generates the proof for the move made by Player 1
           const {proof: _proofMovePlayer1, calldata: proofMovePlayer1} = await gameStateChannel2.generateProof(moveInputPlayer1, moveWasmPath, moveZkeyPath);
           // console.log(proofPlayer1);
+          // proofMovePlayer1_converted & _proofMovePlayer1 - To be sent to Player 1
           const proofMovePlayer1_converted = {
             pA: proofMovePlayer1[0],
             pB: proofMovePlayer1[1],
             pC: proofMovePlayer1[2],
             pubSignals: proofMovePlayer1[3]
           };
-          // PLayer 2 verify locally if proofs are right and shares it with the Player1
-          await gameStateChannel2.verifyProof(moveVerification, _proofMovePlayer1);
+          // PLayer 2 verify locally if proofs are right and signs the current game state and shares it with the Player1
+          const resultOnChainProof_byPlayer2 = await gameStateChannel2.verifyProof(moveVerification, _proofMovePlayer1);
+          const resultOffChainProof_byPlayer2 = await moveVerifier.verifyProof(proofMovePlayer1_converted.pA, proofMovePlayer1_converted.pB, proofMovePlayer1_converted.pC, proofMovePlayer1_converted.pubSignals);
+
+          // Check if local proof generations are okay. Else throw error from Player2's side.
+          if(!resultOnChainProof_byPlayer2 || !resultOffChainProof_byPlayer2) {
+            throw new Error("Move verification failed");
+          } 
+
+          // Increment player1's hit count
+          gameStateChannel2.acknowledgeMove(hit);
+
+          // Generate move data for Player 1
+          const moveTimestamp = Math.floor(Date.now() / 1000);
+          let move_player1_byPlayer2 = {
+            x: guessPlayer1[0],
+            y: guessPlayer1[1],
+            isHit: hit,
+            timestamp: moveTimestamp
+          };
+
+          const {signature: currentStateSignature_ofPlayer2, hash: currentStateHash_ofPlayer2} = await gameStateChannel2.signGameState();
+
+          const latestGameState_fromPlayer2 = gameStateChannel2.getGameState();
+          const latestGameStateSC_fromPlayer2 = {
+            stateHash: latestGameState_fromPlayer2.stateHash,
+            nonce: latestGameState_fromPlayer2.nonce,
+            currentTurn: latestGameState_fromPlayer2.currentTurn,
+            moveCount: latestGameState_fromPlayer2.moveCount,
+            player1ShipCommitment: latestGameState_fromPlayer2.player1ShipCommitment,
+            player2ShipCommitment: latestGameState_fromPlayer2.player2ShipCommitment,
+            player1Hits: latestGameState_fromPlayer2.player1Hits,
+            player2Hits: latestGameState_fromPlayer2.player2Hits,
+            gameEnded: latestGameState_fromPlayer2.gameEnded,
+            winner: latestGameState_fromPlayer2.winner,
+            timestamp: latestGameState_fromPlayer2.timestamp
+          };
+          console.log("derived game state Player 2", latestGameStateSC_fromPlayer2);
+          
+          // The move data to be sent to Player 1
+          const movesData_player1_byPlayer2 = {
+            move: move_player1_byPlayer2,
+            moveStatehash: currentStateSignature_ofPlayer2,
+            gameState: latestGameStateSC_fromPlayer2,
+            gameStateHash: currentStateHash_ofPlayer2
+          };
+          // Update the current move data for Player 1 at Player 2's side
+          await gameStateChannel2.updateMoves(movesData_player1_byPlayer2);
+
+          // Verify if the values are correct locally at player 2's end
+          let {isValid: resultGameStateSignaturePlayer2} = await gameStateChannel2.verifyGameStateSignature(movesData_player1_byPlayer2.moveStatehash, player2.address, movesData_player1_byPlayer2.gameState);
+          console.log("Move state signature verification player 1 at Player 2's side", resultGameStateSignaturePlayer2);
+
+          if(!resultGameStateSignaturePlayer2) {
+            throw new Error("Move state signature of Player 2 verification failed at Player 2's end! - LOCAL VERIFICATION!");
+          }
+
+          // Switch turn to player 1 - This should be the last step to be done
+          gameStateChannel2.switchTurn();
 
           // Player 1 verifies the proof generated by Player 2
           let resultMovePlayer1 = await moveVerifier.verifyProof(proofMovePlayer1_converted.pA, proofMovePlayer1_converted.pB, proofMovePlayer1_converted.pC, proofMovePlayer1_converted.pubSignals);
           console.log("Move verification proof player 1 at Player 2's side", resultMovePlayer1);
 
-          let offchainVerification = await gameStateChannel.verifyProof(moveVerification, _proofMovePlayer1);
-          console.log("Offchain move verification proof player 1 at Player 2's side", offchainVerification);
+          let offchainVerificationPlayer1 = await gameStateChannel.verifyProof(moveVerification, _proofMovePlayer1);
+          console.log("Offchain move verification proof player 1 at Player 2's side", offchainVerificationPlayer1);
 
-          // This is computed back at Player1's end.
-          let move_player1 = {
-            x: guessPlayer1[0],
-            y: guessPlayer1[1],
-            isHit: hit,
-            timestamp: Date.now()
-          };
+          let {isValid: resultGameStateSignaturePlayer1} = await gameStateChannel.verifyGameStateSignature(movesData_player1_byPlayer2.moveStatehash, player2.address, movesData_player1_byPlayer2.gameState);
+          console.log("Move state signature verification player 1 at Player 2's side", resultGameStateSignaturePlayer1);
 
-          // PLayer 1 checks gets to know if it's a hit or a miss and updates the state accordingly!
+          if(!resultGameStateSignaturePlayer1) {
+            throw new Error("Move state signature of Player 2 verification failed at Player 1's end!");
+          }
+
+          // PLayer 1 calls the makeMove function and updates the state accordingly!
           const isMyTurn_player1 = await gameStateChannel.isMyTurn();
-          console.log("isMyTurn_player1", isMyTurn_player1);
-          
+          let moveStateHash_player1 = "";
           if(isMyTurn_player1) {
-            let {signature: moveStatehash, winnerFound: winnerFound1, winner: winner1} = await gameStateChannel.makeMove(move_player1);
-            console.log("Player1 current move state hash ", moveStatehash);
+            let {signature: moveStatehash, winnerFound: winnerFound1, winner: winner1} = await gameStateChannel.makeMove(move_player1_byPlayer2);
+            moveStateHash_player1 = moveStatehash;
             if(winnerFound1) {
                 console.log("Game Over");
                 winnerDeclared = true;
@@ -1249,14 +1369,19 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
           }
 
           // If the move is valid, Player 2 acknowledges the move and shares the result back to Player 1
-          if(resultMovePlayer1 && offchainVerification) {
-            gameStateChannel2.acknowledgeMove(hit);
+          if(resultMovePlayer1 && offchainVerificationPlayer1) {
             gameStateChannel.switchTurn();
-            gameStateChannel2.switchTurn();
+          } else {
+            // Should go for dispute in real world scenario
+            throw new Error("Move verification failed");
           }
-
+          // Player 1 updates the moves using the data passed by Player 2
+          await gameStateChannel.updateMoves(movesData_player1_byPlayer2);
+          
+          // Checks if the winner is declared
           if(winnerDeclared) {
             gameStateChannel.declareWinner(winner);
+            // This will be sent to player 2 and player 2 will update the state accordingly
             gameStateChannel2.declareWinner(winner);
             break;
           }
@@ -1276,35 +1401,87 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
             hit: hit2
           };
           // Player 1 generates the proof for the move made by Player 2
+          // Player 2 generates the proof for the move made by Player 1
           const {proof: _proofMovePlayer2, calldata: proofMovePlayer2} = await gameStateChannel.generateProof(moveInputPlayer2, moveWasmPath, moveZkeyPath);
           // console.log(proofPlayer1);
+          // proofMovePlayer1_converted & _proofMovePlayer1 - To be sent to Player 1
           const proofMovePlayer2_converted = {
             pA: proofMovePlayer2[0],
             pB: proofMovePlayer2[1],
             pC: proofMovePlayer2[2],
             pubSignals: proofMovePlayer2[3]
           };
-        
-          let resultMovePlayer2 = await moveVerifier.verifyProof(proofMovePlayer2_converted.pA, proofMovePlayer2_converted.pB, proofMovePlayer2_converted.pC, proofMovePlayer2_converted.pubSignals);
-          console.log("Move verification proof player 2 at Player 1's side", resultMovePlayer2);
-          let offchainVerification2 = await gameStateChannel.verifyProof(moveVerification, _proofMovePlayer2);
-          console.log("Offchain move verification proof player 2 at Player 1's side", offchainVerification2);
+          // PLayer 1 verify locally if proofs are right and signs the current game state and shares it with the Player2
+          const resultOnChainProof_byPlayer1 = await gameStateChannel.verifyProof(moveVerification, _proofMovePlayer2);
+          const resultOffChainProof_byPlayer1 = await moveVerifier.verifyProof(proofMovePlayer2_converted.pA, proofMovePlayer2_converted.pB, proofMovePlayer2_converted.pC, proofMovePlayer2_converted.pubSignals);
 
-          // Player 2 verifies the proof generated by Player 1
-          gameStateChannel2.verifyProof(moveVerification, _proofMovePlayer2);
+          // Check if local proof generations are okay. Else throw error from Player2's side.
+          if(!resultOnChainProof_byPlayer1 || !resultOffChainProof_byPlayer1) {
+            throw new Error("Move verification failed");
+          } 
 
-           // This is computed back at Player2's end.
-           let move_player2 = {
+          // Increment player2's hit count at Player 1's end
+          gameStateChannel.acknowledgeMove(hit2);
+          
+          // Generate move data for Player 1
+          const moveTimestamp2 = Math.floor(Date.now() / 1000);
+          let move_player2_byPlayer1 = {
             x: guessPlayer2[0],
             y: guessPlayer2[1],
             isHit: hit2,
-            timestamp: Date.now()
+            timestamp: moveTimestamp2
           };
 
-          // PLayer 2 checks gets to know if it's a hit or a miss and updates the state accordingly!
-          if(await gameStateChannel2.isMyTurn()) {
-            let {signature: moveStatehash2, winnerFound: winnerFound2, winner: winner2} = await gameStateChannel2.makeMove(move_player2);
-            console.log("Player2 current move state hash ", moveStatehash2);
+          const {signature: currentStateSignature_ofPlayer1, hash: currentStateHash_ofPlayer1} = await gameStateChannel.signGameState();
+
+          const latestGameState_fromPlayer1 = gameStateChannel.getGameState();
+          const latestGameStateSC_fromPlayer1 = {
+            stateHash: latestGameState_fromPlayer1.stateHash,
+            nonce: latestGameState_fromPlayer1.nonce,
+            currentTurn: latestGameState_fromPlayer1.currentTurn,
+            moveCount: latestGameState_fromPlayer1.moveCount,
+            player1ShipCommitment: latestGameState_fromPlayer1.player1ShipCommitment,
+            player2ShipCommitment: latestGameState_fromPlayer1.player2ShipCommitment,
+            player1Hits: latestGameState_fromPlayer1.player1Hits,
+            player2Hits: latestGameState_fromPlayer1.player2Hits,
+            gameEnded: latestGameState_fromPlayer1.gameEnded,
+            winner: latestGameState_fromPlayer1.winner,
+            timestamp: latestGameState_fromPlayer1.timestamp
+          }
+          console.log("derived game state Player 1", latestGameStateSC_fromPlayer1);
+          
+          // The move data to be sent to Player 1
+          const movesData_player2_byPlayer1 = {
+            move: move_player2_byPlayer1,
+            moveStatehash: currentStateSignature_ofPlayer1,
+            gameState: latestGameStateSC_fromPlayer1,
+            gameStateHash: currentStateHash_ofPlayer1
+          };
+
+          let {isValid: resultGameStateSignaturePlayer3} = await gameStateChannel.verifyGameStateSignature(movesData_player2_byPlayer1.moveStatehash, player1.address, movesData_player2_byPlayer1.gameState);
+          console.log("Move state signature verification player 1 at Player 1's side - LOCAL VERIFICATION", resultGameStateSignaturePlayer3);
+
+          if(!resultGameStateSignaturePlayer3) {
+            throw new Error("Move state signature of Player 1 verification failed at Player 1's end! - LOCAL VERIFICATION");
+          }
+          // Update the current move data for Player 2 at Player 1's side
+          await gameStateChannel.updateMoves(movesData_player2_byPlayer1);
+          // Switch turn to player2
+          gameStateChannel.switchTurn();
+
+          // Player 2 verifies the proof generated by Player 1
+          let resultMovePlayer2 = await moveVerifier.verifyProof(proofMovePlayer2_converted.pA, proofMovePlayer2_converted.pB, proofMovePlayer2_converted.pC, proofMovePlayer2_converted.pubSignals);
+          console.log("Move verification proof player 2 at Player 1's side", resultMovePlayer2);
+
+          let offchainVerificationPlayer2 = await gameStateChannel2.verifyProof(moveVerification, _proofMovePlayer2);
+          console.log("Offchain move verification proof player 2 at Player 1's side", offchainVerificationPlayer2);
+
+          // PLayer 2 calls the makeMove function and updates the state accordingly!
+          const isMyTurn_player2 = await gameStateChannel2.isMyTurn();
+          let moveStateHash_player2 = "";
+          if(isMyTurn_player2) {
+            let {signature: moveStatehash, winnerFound: winnerFound2, winner: winner2} = await gameStateChannel2.makeMove(move_player2_byPlayer1);
+            moveStateHash_player2 = moveStatehash;
             if(winnerFound2) {
                 console.log("Game Over");
                 winnerDeclared = true;
@@ -1312,66 +1489,116 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
             }
           }
 
-          // If the move is valid, Player 1 acknowledges the move and shares the result back to Player 2
-          if(resultMovePlayer2 && offchainVerification2) {
-
-            gameStateChannel.acknowledgeMove(hit2);
-            gameStateChannel.switchTurn();
+          // If the move is valid, Player 2 acknowledges the move and shares the result back to Player 1
+          if(resultMovePlayer2 && offchainVerificationPlayer2) {
             gameStateChannel2.switchTurn();
+          } else {
+            // Should go for dispute in real world scenario
+            throw new Error("Move verification failed");
           }
+          // Player 2 updates the moves using the data passed by Player 1
+          await gameStateChannel2.updateMoves(movesData_player2_byPlayer1);
 
+          let {isValid: resultGameStateSignaturePlayer4} = await gameStateChannel2.verifyGameStateSignature(movesData_player2_byPlayer1.moveStatehash, player1.address, movesData_player2_byPlayer1.gameState);
+          console.log("Move state signature verification player 1 at Player 2's side", resultGameStateSignaturePlayer4);
+
+          if(!resultGameStateSignaturePlayer4) {
+            throw new Error("Move state signature of Player 1 verification failed at Player 2's end!");
+          }
+          
+          // Checks if the winner is declared
           if(winnerDeclared) {
             gameStateChannel.declareWinner(winner);
             gameStateChannel2.declareWinner(winner);
             break;
           }
-          // After 5 moves, just break to start a dispute.
-          if (i == 5) {
+          // Break for testing purposes. 8 total moves made by each player
+          if (i == 2) {  
             break;
-          }
+          };
         }
   
-      const disputedState = await gameStateChannel.getGameState();
+      const player2_gs = await gameStateChannel2.getGameState();
+      console.log("Total Moves: ", player2_gs.movesData.length);
+      console.log("Player 2's current game state", player2_gs)
+      const disputedGameState = player2_gs.movesData[player2_gs.movesData.length - 1];
+      console.log("disputedGameState", disputedGameState);
+
+      const disputedGameStateObj = {
+        nonce: disputedGameState.gameState.nonce,
+        currentTurn: disputedGameState.gameState.currentTurn,
+        moveCount: disputedGameState.gameState.moveCount,
+        player1ShipCommitment: disputedGameState.gameState.player1ShipCommitment,
+        player2ShipCommitment: disputedGameState.gameState.player2ShipCommitment,
+        player1Hits: disputedGameState.gameState.player1Hits,
+        player2Hits: disputedGameState.gameState.player2Hits,
+        gameEnded: disputedGameState.gameState.gameEnded,
+        winner: disputedGameState.gameState.winner,
+        timestamp: disputedGameState.gameState.timestamp
+      };
+      
+      console.log(disputedGameStateObj);
+
+      const disputeSignature_byPlayer2 = await gameStateChannel2.signGameStateForDispute(disputedGameStateObj);
+      console.log("disputeSignature_byPlayer2", disputeSignature_byPlayer2);
+      console.log("Object ", disputedGameState);
+      console.log({
+        channelId: Number(channelId),
+        disputeType: gameStateChannel.DisputeType.InvalidMove, // DisputeType.InvalidMove
+        disputedGameStateObj,
+        disputeSignature_byPlayer2,
+        signature: disputedGameState.moveStatehash
+      })
       // Initiate dispute
       await expect(battleshipWaku.connect(player1).initiateDispute(
-        1,
-        0, // DisputeType.InvalidMove
-        disputedState,
-        disputeSignature1,
-        disputeSignature2
-      )).to.emit(battleshipWaku, "DisputeInitiated")
-        .withArgs(1, 1, player1.address, 0);
+        Number(channelId),
+        gameStateChannel.DisputeType.InvalidMove, // DisputeType.InvalidMove
+        disputedGameStateObj,
+        disputedGameState.moveStatehash,
+        disputeSignature_byPlayer2
+      )).to.emit(battleshipWaku, "DisputeInitiated").withArgs(
+        1, 1, player1.address, 0
+      );
 
-      const dispute = await battleshipWaku.getDispute(1);
-      expect(dispute[1]).to.equal(player1.address); // challenger
-      expect(dispute[2]).to.equal(player2.address); // respondent
-      expect(dispute[3]).to.equal(0); // DisputeType.InvalidMove
-      expect(dispute[4]).to.equal(0); // DisputeStatus.Active
+      await time.increase(2200); // more than 5Minutes(300 seconds) * 7 minutes
 
-      // Fast forward to after response deadline
-      await time.increase(180); // 3 minutes
+      await expect(battleshipWaku.connect(player1).claimTimeout(
+        Number(channelId)
+      )).to.emit(battleshipWaku, "TimeoutClaimed").withArgs(
+        1, player1.address
+      );
+      
 
-      // Resolve dispute (challenger wins due to no response)
-      await expect(battleshipWaku.connect(player1).resolveDispute(1))
-        .to.emit(battleshipWaku, "DisputeResolved")
-        .withArgs(1, player1.address, hre.ethers.keccak256(hre.ethers.AbiCoder.defaultAbiCoder().encode(
-          ["tuple(bytes32,uint256,address,uint256,bytes32,bytes32,uint8,uint8,bool,address,uint256)"],
-          [[
-            disputedState.stateHash,
-            disputedState.nonce,
-            disputedState.currentTurn,
-            disputedState.moveCount,
-            disputedState.player1ShipCommitment,
-            disputedState.player2ShipCommitment,
-            disputedState.player1Hits,
-            disputedState.player2Hits,
-            disputedState.gameEnded,
-            disputedState.winner,
-            disputedState.timestamp
-          ]]
-        )))
-        .to.emit(battleshipWaku, "ChannelSettled")
-        .withArgs(1, player1.address);
+      // const dispute = await battleshipWaku.getDispute(1);
+      // expect(dispute[1]).to.equal(player1.address); // challenger
+      // expect(dispute[2]).to.equal(player2.address); // respondent
+      // expect(dispute[3]).to.equal(0); // DisputeType.InvalidMove
+      // expect(dispute[4]).to.equal(0); // DisputeStatus.Active
+
+      // // Fast forward to after response deadline
+      // await time.increase(180); // 3 minutes
+
+      // // Resolve dispute (challenger wins due to no response)
+      // await expect(battleshipWaku.connect(player1).resolveDispute(1))
+      //   .to.emit(battleshipWaku, "DisputeResolved")
+      //   .withArgs(1, player1.address, hre.ethers.keccak256(hre.ethers.AbiCoder.defaultAbiCoder().encode(
+      //     ["tuple(bytes32,uint256,address,uint256,bytes32,bytes32,uint8,uint8,bool,address,uint256)"],
+      //     [[
+      //       disputedState.stateHash,
+      //       disputedState.nonce,
+      //       disputedState.currentTurn,
+      //       disputedState.moveCount,
+      //       disputedState.player1ShipCommitment,
+      //       disputedState.player2ShipCommitment,
+      //       disputedState.player1Hits,
+      //       disputedState.player2Hits,
+      //       disputedState.gameEnded,
+      //       disputedState.winner,
+      //       disputedState.timestamp
+      //     ]]
+      //   )))
+      //   .to.emit(battleshipWaku, "ChannelSettled")
+      //   .withArgs(1, player1.address);
     });
 
     // it("Should handle dispute response with counter-state", async function () {

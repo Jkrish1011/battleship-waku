@@ -8,8 +8,6 @@ const snarkjs = require("snarkjs");
 //     commitment: string; // bytes 32
 // }
 
-enum DisputeType { InvalidMove, InvalidShipPlacement, GameEnd, Timeout }
-
 interface ZKProofData {
     pi_a: string[];
     pi_b: string[][];
@@ -47,18 +45,33 @@ interface Move {
     timestamp: number;
 }
 
-interface MovesData {
-    move: Move;
-    signature: string;
-    gameState: GameState;
-    gameStateHash: string;
-}
-
 interface SignatureResponse {
     message: string;
     signature: string;
     address: string;
 }
+
+interface GameStateSmartContract {
+    stateHash?:       string;   // bytes32 (optional caching)
+    nonce:           number;
+    currentTurn:     string;   // address
+    moveCount:       number;   // uint256
+    player1ShipCommitment: string; // bytes32
+    player2ShipCommitment: string; // bytes32
+    player1Hits:     number;   // uint8
+    player2Hits:     number;   // uint8
+    gameEnded:       boolean;
+    winner:          string;   // address
+    timestamp:       number;   // uint256 (block-time analogue)
+}
+
+interface MovesData {
+    move: Move;
+    signature: string;
+    gameState: GameStateSmartContract;
+    gameStateHash: string;
+}
+
 
 interface GameState {
     stateHash?:       string;   // bytes32 (optional caching)
@@ -113,6 +126,7 @@ export class GameStateChannel {
     private shipSizes: number[];
     private chainId: number;
     private contractAddress: string;
+    DisputeType: { InvalidMove: number; InvalidShipPlacement: number; GameEnd: number; Timeout: number };
 
     constructor(wakuRoomId: string, signer: ethers.Signer, chainId: number, contractAddress: string, localPlayerRole: 'initiator' | 'challenger') {
         this.gameState = {
@@ -141,8 +155,14 @@ export class GameStateChannel {
         this.shipSizes = [3, 3, 2, 2, 2];
         this.chainId = chainId;
         this.contractAddress = contractAddress;
+        this.DisputeType = {
+            InvalidMove: 0,
+            InvalidShipPlacement: 1,
+            GameEnd: 2,
+            Timeout: 3
+        };
     }
-
+    
     on(event: string, callback: Function) : void {
         if (!this.eventListeners.has(event)) {
             this.eventListeners.set(event, []);
@@ -192,15 +212,15 @@ export class GameStateChannel {
     //     return combinedHash;
     // }
 
-    private async computeStateHash(chainId: number, contractAddress: string): Promise<string> {
+    private async computeStateHash(): Promise<string> {
         if (!this.gameState) throw new GameStateChannelError("Game state not initialized");
         
         // 1. EIP-712 Domain
         const domain: TypedDataDomain = {
             name: "Battleship",
             version: "1",
-            chainId: chainId,
-            verifyingContract: contractAddress
+            chainId: this.chainId,
+            verifyingContract: this.contractAddress
         };
        
         // 2. EIP-712 Types
@@ -232,19 +252,177 @@ export class GameStateChannel {
             timestamp: this.gameState.timestamp
         };
          
+        // // 4. Sign the typed data using EIP-712
+        // const signature = await (this.signer as any).signTypedData(domain, types, value);
+
+        // Compute the EIP-712 hash
+        const hash = ethers.TypedDataEncoder.hash(domain, types, value);
+        return hash;
+    }
+
+    private async _computeOpponentGameStateHash(opponentGameState: GameState): Promise<string> {
+        
+        // 1. EIP-712 Domain
+        const domain: TypedDataDomain = {
+            name: "Battleship",
+            version: "1",
+            chainId: this.chainId,
+            verifyingContract: this.contractAddress
+        };
+       
+        // 2. EIP-712 Types
+        const types: Record<string, TypedDataField[]> = {
+            GameState: [
+                { name: "nonce", type: "uint256" },
+                { name: "currentTurn", type: "address" },
+                { name: "moveCount", type: "uint256" },
+                { name: "player1ShipCommitment", type: "bytes32" },
+                { name: "player2ShipCommitment", type: "bytes32" },
+                { name: "player1Hits", type: "uint8" },
+                { name: "player2Hits", type: "uint8" },
+                { name: "gameEnded", type: "bool" },
+                { name: "winner", type: "address" },
+                { name: "timestamp", type: "uint256" }
+            ]
+        };
+    
+        const value = {
+            nonce: opponentGameState.nonce,
+            currentTurn: opponentGameState.currentTurn,
+            moveCount: opponentGameState.moveCount,
+            player1ShipCommitment: opponentGameState.player1ShipCommitment,
+            player2ShipCommitment: opponentGameState.player2ShipCommitment,
+            player1Hits: opponentGameState.player1Hits,
+            player2Hits: opponentGameState.player2Hits,
+            gameEnded: opponentGameState.gameEnded,
+            winner: opponentGameState.winner ?? ethers.ZeroAddress,
+            timestamp: opponentGameState.timestamp
+        };
+         
         // 4. Sign the typed data using EIP-712
         const signature = await (this.signer as any).signTypedData(domain, types, value);
         
         return signature;
     }
 
-    private async signGameState(chainId: number, contractAddress: string): Promise<string> {
+    async signGameStateForDispute(challengedGameState: GameState) : Promise<string> {
+        if(!this.signer || !this.gameState) {
+            throw new GameStateChannelError("Signer or game state not available");
+        }
+
+        const signature: string = await this._computeOpponentGameStateHash(challengedGameState);
+        return signature;
+    }
+
+    async signGameState(): Promise<{hash: string, signature: string}> {
         if (!this.signer || !this.gameState) {
             throw new GameStateChannelError("Signer or game state not available");
         }
         
-        const signature: string = await this.computeStateHash(chainId, contractAddress);
-        return signature;
+        const hash: string = await this.computeStateHash();
+        // 1. EIP-712 Domain
+        const domain: TypedDataDomain = {
+            name: "Battleship",
+            version: "1",
+            chainId: this.chainId,
+            verifyingContract: this.contractAddress
+        };
+       
+        // 2. EIP-712 Types
+        const types: Record<string, TypedDataField[]> = {
+            GameState: [
+                { name: "nonce", type: "uint256" },
+                { name: "currentTurn", type: "address" },
+                { name: "moveCount", type: "uint256" },
+                { name: "player1ShipCommitment", type: "bytes32" },
+                { name: "player2ShipCommitment", type: "bytes32" },
+                { name: "player1Hits", type: "uint8" },
+                { name: "player2Hits", type: "uint8" },
+                { name: "gameEnded", type: "bool" },
+                { name: "winner", type: "address" },
+                { name: "timestamp", type: "uint256" }
+            ]
+        };
+    
+        const value = {
+            nonce: this.gameState.nonce,
+            currentTurn: this.gameState.currentTurn,
+            moveCount: this.gameState.moveCount,
+            player1ShipCommitment: this.gameState.player1ShipCommitment,
+            player2ShipCommitment: this.gameState.player2ShipCommitment,
+            player1Hits: this.gameState.player1Hits,
+            player2Hits: this.gameState.player2Hits,
+            gameEnded: this.gameState.gameEnded,
+            winner: this.gameState.winner ?? ethers.ZeroAddress,
+            timestamp: this.gameState.timestamp
+        };
+        console.log("GameState to be signed", value);
+         
+        // 4. Sign the typed data using EIP-712
+        const signature = await (this.signer as any).signTypedData(domain, types, value);
+        return {hash, signature};
+    }
+
+    async verifyGameStateSignature(signature: string, expectedSigner: string, gameState: GameState): Promise<{isValid: boolean, recoveredSigner?: string, error?: string}> {
+        try {
+            if (!gameState) {
+                return { isValid: false, error: "Game state not available" };
+            }
+
+            const domain: TypedDataDomain = {
+                name: "Battleship",
+                version: "1",
+                chainId: this.chainId,
+                verifyingContract: this.contractAddress
+            };
+        
+            const types: Record<string, TypedDataField[]> = {
+                GameState: [
+                    { name: "nonce", type: "uint256" },
+                    { name: "currentTurn", type: "address" },
+                    { name: "moveCount", type: "uint256" },
+                    { name: "player1ShipCommitment", type: "bytes32" },
+                    { name: "player2ShipCommitment", type: "bytes32" },
+                    { name: "player1Hits", type: "uint8" },
+                    { name: "player2Hits", type: "uint8" },
+                    { name: "gameEnded", type: "bool" },
+                    { name: "winner", type: "address" },
+                    { name: "timestamp", type: "uint256" }
+                ]
+            };
+
+            const value = {
+                nonce: gameState.nonce,
+                currentTurn: gameState.currentTurn,
+                moveCount: gameState.moveCount,
+                player1ShipCommitment: gameState.player1ShipCommitment,
+                player2ShipCommitment: gameState.player2ShipCommitment,
+                player1Hits: gameState.player1Hits,
+                player2Hits: gameState.player2Hits,
+                gameEnded: gameState.gameEnded,
+                winner: gameState.winner ?? ethers.ZeroAddress,
+                timestamp: gameState.timestamp
+            };
+
+            console.log("GameState being verified", value);
+            
+            const recoveredSigner = ethers.verifyTypedData(domain, types, value, signature);
+            
+            const isValid = recoveredSigner.toLowerCase() === expectedSigner.toLowerCase();
+            
+            return { 
+                isValid, 
+                recoveredSigner,
+                error: isValid ? undefined : `Expected ${expectedSigner}, got ${recoveredSigner}`
+            };
+            
+        } catch (error) {
+            console.error('GameState signature verification failed:', error);
+            return { 
+                isValid: false, 
+                error: error instanceof Error ? error.message : 'Unknown verification error'
+            };
+        }
     }
 
     // Helper method to convert BigInt to bytes32 (matching Solidity bytes32() conversion)
@@ -315,8 +493,8 @@ export class GameStateChannel {
         this.gameState.winner = winner;
         this.gameState.nonce++;
 
-        const signature = await this.signGameState(this.chainId, this.contractAddress);
-        this.emit('gameEnded', { winner, gameState: this.gameState, signature: signature });
+        const {hash, signature} = await this.signGameState();
+        this.emit('gameEnded', { winner, gameState: this.gameState, signature: signature, hash: hash });
     }
 
     private computeMessageHash(message: StateChannelMessage): string {
@@ -920,10 +1098,7 @@ export class GameStateChannel {
         }
 
         const myAddress = await this.signer.getAddress();
-        console.log("Derived address is ", myAddress);
-        console.log("Current turn is ", this.gameState.currentTurn);
         const res = this.gameState.currentTurn === myAddress;
-        console.log("result ", res);
         return res;
     }
     
@@ -938,7 +1113,7 @@ export class GameStateChannel {
         player2ShipCommitment: string,
         player2MerkleRoot: string,
         player2ShipPlacementProof: ZKCalldataProof
-    ): Promise<string> {
+    ): Promise<{hash: string, signature: string}> {
 
         if (!this.gameState) {
             throw new GameStateChannelError("Game state not initialized");
@@ -960,14 +1135,15 @@ export class GameStateChannel {
 
             this.gameState.localPlayerRole = (await this.signer?.getAddress()) === player1 ? "initiator" : "challenger";
 
-            const signature = await this.signGameState(this.chainId, this.contractAddress);
-            this.gameState.stateHash = signature;
+            const {hash, signature} = await this.signGameState();
+            this.gameState.stateHash = hash;
             this.emit('gameCreated', this.gameState);
-            console.log("signature", signature)
-            return signature;
+            console.log("signature", signature);
+            console.log("hash", hash);
+            return {hash, signature};
         }catch(err){
             console.error(err);
-            return "";
+            return {hash: "", signature: ""};
         }
     }
 
@@ -1021,7 +1197,7 @@ export class GameStateChannel {
 
     async makeMove(
         move: Move
-    ): Promise<{signature: string, winnerFound: boolean, winner: string}> {
+    ): Promise<{signature: string, winnerFound: boolean, winner: string, hash: string}> {
         let winnerFound = false, winner = ethers.ZeroAddress;
         if (!this.gameState) {
             throw new GameStateChannelError("Game state not initialized!");
@@ -1056,18 +1232,12 @@ export class GameStateChannel {
                 } else {
                     console.log("player 2 hits");
                     this.gameState.player2Hits++;
-                    
                 }
             }
         
-            // // Switch turns
-            // console.log("Current Turn ", this.gameState.currentTurn);
-            // this.gameState.currentTurn = this.gameState.currentTurn === this.gameState.player1 ? this.gameState.player2 : this.gameState.player1;
-            // console.log("Updated Current Turn ", this.gameState.currentTurn);
-        
-            const signature = await this.signGameState(this.chainId, this.contractAddress);
-            this.gameState.stateHash = signature;
-            this.emit('moveMade', { playerRole: this.gameState.localPlayerRole , move, gameState: this.gameState });
+            const {hash, signature} = await this.signGameState();
+            this.gameState.stateHash = hash;
+            this.emit('moveMade', { playerRole: this.gameState.localPlayerRole , move, gameState: this.gameState, signature, hash });
         
             // Check for win condition (12 total ship cells)
             if (this.gameState.player1Hits === 12 || this.gameState.player2Hits === 12) {
@@ -1075,10 +1245,10 @@ export class GameStateChannel {
                 winner = this.gameState.currentTurn;
             }
         
-            return {signature, winnerFound, winner};
+            return {signature, winnerFound, winner, hash};
         }catch(error) {
             console.error(error);
-            return {signature: "", winnerFound: false, winner: ethers.ZeroAddress};
+            return {signature: "", winnerFound: false, winner: ethers.ZeroAddress, hash: ""};
         }
        
     }
