@@ -474,7 +474,7 @@ contract BattleshipStateChannel is Initializable, OwnableUpgradeable, UUPSUpgrad
         // Store final state
         gameStates[stateHash] = finalState;
 
-        emit ChannelSettled(channelId, finalState.winner);
+        emit ChannelSettled(channelId, channel.winner);
     }
 
     function claimTimeout(uint256 channelId) external {
