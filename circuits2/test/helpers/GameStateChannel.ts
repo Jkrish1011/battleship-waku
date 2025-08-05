@@ -70,6 +70,7 @@ interface MovesData {
     signature: string;
     gameState: GameStateSmartContract;
     gameStateHash: string;
+    proofs: {calldata: ZKCalldataProof, proof: ZKProofData};
 }
 
 
@@ -356,7 +357,6 @@ export class GameStateChannel {
             winner: this.gameState.winner ?? ethers.ZeroAddress,
             timestamp: this.gameState.timestamp
         };
-        console.log("GameState to be signed", value);
          
         // 4. Sign the typed data using EIP-712
         const signature = await (this.signer as any).signTypedData(domain, types, value);
