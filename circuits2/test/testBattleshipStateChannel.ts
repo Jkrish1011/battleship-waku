@@ -1958,7 +1958,8 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
             move: move_player1_byPlayer2,
             moveStatehash: currentStateSignature_ofPlayer2,
             gameState: latestGameStateSC_fromPlayer2,
-            gameStateHash: currentStateHash_ofPlayer2
+            gameStateHash: currentStateHash_ofPlayer2,
+            proofs: {proof: _proofMovePlayer1, calldata: proofMovePlayer1_converted}
           };
           // Update the current move data for Player 1 at Player 2's side
           await gameStateChannel2.updateMoves(movesData_player1_byPlayer2);
@@ -2089,7 +2090,7 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
             moveStatehash: currentStateSignature_ofPlayer1,
             gameState: latestGameStateSC_fromPlayer1,
             gameStateHash: currentStateHash_ofPlayer1,
-            proofs: proofMovePlayer2_converted
+            proofs: {proof: _proofMovePlayer2, calldata: proofMovePlayer2_converted}
           };
 
           let {isValid: resultGameStateSignaturePlayer3} = await gameStateChannel.verifyGameStateSignature(movesData_player2_byPlayer1.moveStatehash, player1.address, movesData_player2_byPlayer1.gameState);
@@ -2153,6 +2154,7 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
         }
   
         const player2_gs = await gameStateChannel2.getGameState();
+        
         console.log("Total Moves: ", player2_gs.movesData.length);
         console.log("Player 2's current game state", player2_gs)
         const disputedGameState = player2_gs.movesData[player2_gs.movesData.length - 1];
@@ -2184,41 +2186,43 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
           signature: disputedGameState.moveStatehash
         })
         // Initiate dispute
-        await expect(battleshipWaku.connect(player1).initiateDispute(
+        await expect(battleshipWaku.connect(player2).initiateDispute(
           Number(channelId),
           gameStateChannel.DisputeType.InvalidMove, // DisputeType.InvalidMove
           disputedGameStateObj,
           disputedGameState.moveStatehash,
           disputeSignature_byPlayer2
         )).to.emit(battleshipWaku, "DisputeInitiated").withArgs(
-          1, 1, player1.address, 0
+          1, 1, player2.address, 0
         );
 
-        // Prepare all the moves made in the game by both the players using player 2's movesData
-        const movesData_player2_byPlayer2 = player2_gs.movesData;
+        // Prepare all the moves made in the game by both the players using player 1's movesData
+        const player1_gs = await gameStateChannel.getGameState();
+
+        const player1_moveProofs = player1_gs.movesData.map((move: any) => move.proofs.calldata);
 
         // Respond to dispute with counter-state
         await expect(battleshipWaku.connect(player2).respondToDispute(
           1,
-          counterState,
-          counterSignature1,
-          counterSignature2,
-          moveProofs
+          player1_gs,
+          disputeSignature_byPlayer2,
+          disputeSignature_byPlayer2,
+          player1_moveProofs
         )).to.emit(battleshipWaku, "DisputeChallenged")
           .withArgs(1, player2.address, hre.ethers.keccak256(hre.ethers.AbiCoder.defaultAbiCoder().encode(
             ["tuple(bytes32,uint256,address,uint256,bytes32,bytes32,uint8,uint8,bool,address,uint256)"],
             [[
-              counterState.stateHash,
-              counterState.nonce,
-              counterState.currentTurn,
-              counterState.moveCount,
-              counterState.player1ShipCommitment,
-              counterState.player2ShipCommitment,
-              counterState.player1Hits,
-              counterState.player2Hits,
-              counterState.gameEnded,
-              counterState.winner,
-              counterState.timestamp
+              player1_gs.stateHash,
+              player1_gs.nonce,
+              player1_gs.currentTurn,
+              player1_gs.moveCount,
+              player1_gs.player1ShipCommitment,
+              player1_gs.player2ShipCommitment,
+              player1_gs.player1Hits,
+              player1_gs.player2Hits,
+              player1_gs.gameEnded,
+              player1_gs.winner,
+              player1_gs.timestamp
             ]]
           )));
 

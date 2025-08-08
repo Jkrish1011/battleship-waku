@@ -47,7 +47,7 @@ contract BattleshipStateChannel is Initializable, OwnableUpgradeable, UUPSUpgrad
 
     // Game Dispute Status
     enum ChannelStatus { Open, Disputed, Settled, Closed }
-    enum DisputeType { InvalidMove, InvalidShipPlacement, GameEnd, Timeout }
+    enum DisputeType { InvalidMove, InvalidShipPlacement, GameEnd, Timeout, InvalidProof, MaliciousDispute }
     enum DisputeStatus { Active, Challenged, Resolved }
 
     // Proof Structs
@@ -337,15 +337,59 @@ contract BattleshipStateChannel is Initializable, OwnableUpgradeable, UUPSUpgrad
         require(channelToDispute[channelId] == 0, "Dispute already initiated");
 
         address respondent = msg.sender == channel.player1 ? channel.player2 : channel.player1;
-
-        // Use helper function to compute state hash
         bytes32 stateHash = _computeStateHash(challengedState);
-    
-        require(_verifySignature(stateHash, signature1, channel.player1), "Invalid signature 1");
-        require(_verifySignature(stateHash, signature2, channel.player2), "Invalid signature 2");
 
-        // Create dispute - moved to separate scope to reduce stack depth
-        _createDispute(channelId, disputeType, challengedState, stateHash, respondent);
+        if(disputeType == DisputeType.InvalidMove) {
+            _handleInvalidMoveDispute(channelId, challengedState, signature1, signature2, channel, respondent, stateHash);
+        } else if(disputeType == DisputeType.MaliciousDispute) {
+            _handleMaliciousDispute(channelId, challengedState, signature1, signature2, channel, respondent, stateHash);
+        } else {
+            require(_verifySignature(stateHash, signature1, channel.player1), "Invalid signature 1");
+            require(_verifySignature(stateHash, signature2, channel.player2), "Invalid signature 2");
+
+            // Create dispute - moved to separate scope to reduce stack depth
+            _createDispute(channelId, disputeType, challengedState, stateHash, respondent);
+        }        
+    }
+
+    function _handleMaliciousDispute(
+        uint256 channelId,
+        GameState memory challengedState,
+        bytes calldata signature1,
+        bytes calldata signature2,
+        Channel storage channel,
+        address respondent,
+        bytes32 stateHash
+    ) internal {
+        if (msg.sender == channel.player1) {
+            require(_verifySignature(stateHash, signature1, channel.player1), "Invalid signature 1");
+            // signature2 can be empty since player2 provided invalid proof
+        } else {
+            require(_verifySignature(stateHash, signature2, channel.player2), "Invalid signature 2");
+            // signature1 can be empty since player1 provided invalid proof
+        }
+        
+        _createDispute(channelId, DisputeType.MaliciousDispute, challengedState, stateHash, respondent);
+    }
+
+    function _handleInvalidMoveDispute(
+        uint256 channelId,
+        GameState memory challengedState,
+        bytes calldata signature1,
+        bytes calldata signature2,
+        Channel storage channel,
+        address respondent,
+        bytes32 stateHash
+    ) internal {
+        if (msg.sender == channel.player1) {
+            require(_verifySignature(stateHash, signature1, channel.player1), "Invalid signature 1");
+            // signature2 can be empty since player2 provided invalid proof
+        } else {
+            require(_verifySignature(stateHash, signature2, channel.player2), "Invalid signature 2");
+            // signature1 can be empty since player1 provided invalid proof
+        }
+        
+        _createDispute(channelId, DisputeType.InvalidProof, challengedState, stateHash, respondent);
     }
 
     // Helper function to create dispute - reduces stack depth
@@ -394,7 +438,7 @@ contract BattleshipStateChannel is Initializable, OwnableUpgradeable, UUPSUpgrad
         Channel storage channel = channels[dispute.channelId];
 
         // Verify that the counter-state has high nonce
-        require(counterState.nonce > dispute.challengedNonce, "Nonce too low. Counter-state must have higher nonce");
+        require(counterState.nonce >= dispute.challengedNonce, "Nonce too low. Counter-state must have higher nonce");
 
         bytes32 counterStateHash = _computeStateHash(counterState);
         require(_verifySignature(counterStateHash, signature1, channel.player1), "Invalid signature 1");
