@@ -67,7 +67,10 @@ interface GameStateSmartContract {
 
 interface MovesData {
     move: Move;
-    signature: string;
+    signature: {
+        player1: string;
+        player2: string;
+    };
     gameState: GameStateSmartContract;
     gameStateHash: string;
     proofs: {calldata: ZKCalldataProof, proof: ZKProofData};
@@ -306,7 +309,7 @@ export class GameStateChannel {
         return signature;
     }
 
-    async signGameStateForDispute(challengedGameState: GameState) : Promise<string> {
+    async signCustomGameState(challengedGameState: GameState) : Promise<string> {
         if(!this.signer || !this.gameState) {
             throw new GameStateChannelError("Signer or game state not available");
         }
@@ -404,10 +407,8 @@ export class GameStateChannel {
                 timestamp: gameState.timestamp
             };
 
-            console.log("GameState being verified", value);
             
-            const recoveredSigner = ethers.verifyTypedData(domain, types, value, signature);
-            
+            const recoveredSigner = ethers.verifyTypedData(domain, types, value, signature);            
             const isValid = recoveredSigner.toLowerCase() === expectedSigner.toLowerCase();
             
             return { 

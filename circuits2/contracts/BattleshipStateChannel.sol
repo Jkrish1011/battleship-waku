@@ -389,7 +389,7 @@ contract BattleshipStateChannel is Initializable, OwnableUpgradeable, UUPSUpgrad
             // signature1 can be empty since player1 provided invalid proof
         }
         
-        _createDispute(channelId, DisputeType.InvalidProof, challengedState, stateHash, respondent);
+        _createDispute(channelId, DisputeType.InvalidMove, challengedState, stateHash, respondent);
     }
 
     // Helper function to create dispute - reduces stack depth
