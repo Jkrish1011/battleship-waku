@@ -16,13 +16,12 @@ interface IShipPlacementVerifier {
 }
 
 interface IMoveVerifier {
-    function verifyProof(uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[3] calldata _pubSignals) external view returns (bool);
+    function verifyProof(uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[7] calldata _pubSignals) external view returns (bool);
 }
 
 interface IWinVerifier {
     function verifyProof(uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[3] calldata _pubSignals) external view returns (bool);
 }
-
 
 contract BattleshipStateChannel is Initializable, OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
     
@@ -34,7 +33,7 @@ contract BattleshipStateChannel is Initializable, OwnableUpgradeable, UUPSUpgrad
     // This is keccak256("GameState(uint256 nonce,address currentTurn,uint256 moveCount,bytes32 player1ShipCommitment,bytes32 player2ShipCommitment,uint8 player1Hits,uint8 player2Hits,bool gameEnded,address winner,uint256 timestamp)")
     // Make sure there are no spaces and types are canonical (e.g., uint256, not uint).
     bytes32 public constant GAMESTATE_TYPEHASH = keccak256(
-        "GameState(uint256 nonce,address currentTurn,uint256 moveCount,bytes32 player1ShipCommitment,bytes32 player2ShipCommitment,uint8 player1Hits,uint8 player2Hits,bool gameEnded,address winner,uint256 timestamp)"
+        "GameState(uint256 nonce,address currentTurn,uint256 moveCount,bytes32 player1ShipCommitment,bytes32 player2ShipCommitment,uint8 player1Hits,uint8 player2Hits,bool gameEnded,address winner,uint256 timestamp,bytes32 lastMoveHash)"
     );
 
     // The domain separator, unique to this contract instance.
@@ -44,10 +43,20 @@ contract BattleshipStateChannel is Initializable, OwnableUpgradeable, UUPSUpgrad
     uint256 public constant CHALLENGE_PERIOD = 5 minutes;
     uint256 public constant RESPONSE_PERIOD = 2 minutes;
     uint256 public constant MAX_MOVES = 100; // Prevent infinite games
+    uint256 public constant TOTAL_SHIP_CELLS = 12; // 3 + 3 + 2 + 2 + 2
 
     // Game Dispute Status
     enum ChannelStatus { Open, Disputed, Settled, Closed }
-    enum DisputeType { InvalidMove, InvalidShipPlacement, GameEnd, Timeout, InvalidProof, MaliciousDispute }
+    enum DisputeType { 
+        InvalidMove, // Move outside 0-9 range
+        InvalidShipPlacement, // Board doesn't match original commitment
+        InvalidHitResult,  // Hit/miss doesn't match board
+        ReusedMove, // Same position guessed twice
+        InvalidProof, // Invalid proof submitted
+        MaliciousDispute, // Dispute initiated by malicious player
+        InvalidStateChain, // Invalid state chain submitted,
+        GameContextMismatch   // Game ID or player ID mismatch
+    }
     enum DisputeStatus { Active, Challenged, Resolved }
 
     // Proof Structs
@@ -62,7 +71,7 @@ contract BattleshipStateChannel is Initializable, OwnableUpgradeable, UUPSUpgrad
         uint[2] pA;
         uint[2][2] pB;
         uint[2] pC;
-        uint[3] pubSignals; // [move_x, move_y, hit_result]
+        uint[7] pubSignals; // [ship_commitment, prev_hash, move_count, hit, game_id, player_id, current_move_hash]
     }
 
     struct WinProof {
@@ -96,6 +105,7 @@ contract BattleshipStateChannel is Initializable, OwnableUpgradeable, UUPSUpgrad
         bool gameEnded;
         address winner;
         uint256 timestamp;
+        bytes32 lastMoveHash;
     }
 
     struct Dispute {
@@ -110,6 +120,7 @@ contract BattleshipStateChannel is Initializable, OwnableUpgradeable, UUPSUpgrad
         uint256 challengedNonce;
         GameState challengedState;
         bool resolved;
+        bytes32 disputedMoveHash;
     }
 
     struct StateSubmission {
@@ -125,19 +136,21 @@ contract BattleshipStateChannel is Initializable, OwnableUpgradeable, UUPSUpgrad
     mapping(uint256 => Dispute) public disputes;
     mapping(uint256 => uint256) public channelToDispute; // channelId -> disputeId
     mapping(bytes32 => GameState) public gameStates; // stateHash -> GameState
-    
+    mapping(uint256 => mapping(bytes32 => bool)) public verifiedMoveHashes; // channelId -> moveHash -> verified
+
     uint256 public nextChannelId;
     uint256 public nextDisputeId;
 
     event ChannelOpened(uint256 indexed channelId, address indexed player1, address indexed player2);
     event InitialStateSubmitted(uint256 indexed channelId, address indexed player, bytes32 stateHash);
     event ChannelReady(uint256 indexed channelId, bytes32 initialStateHash);
-    event DisputeInitiated(uint256 indexed channelId, uint256 indexed disputeIOd, address indexed challenger, DisputeType disputeType);
+    event DisputeInitiated(uint256 indexed channelId, uint256 indexed disputeId, address indexed challenger, DisputeType disputeType);
     event DisputeChallenged(uint256 indexed disputeId, address indexed respondent, bytes32 newStateHash);
     event DisputeResolved(uint256 indexed disputeId, address indexed winner, bytes32 finalStateHash);
     event ChannelSettled(uint256 indexed channelId, address indexed winner);
     event ChannelClosed(uint256 indexed channelId);
     event TimeoutClaimed(uint256 indexed channelId, address indexed claimer);
+    event MoveHashVerified(uint256 indexed channelId, bytes32 indexed moveHash, address indexed player);
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -167,37 +180,82 @@ contract BattleshipStateChannel is Initializable, OwnableUpgradeable, UUPSUpgrad
         );
     }
 
-    function _verifyMoveSequence(
-        MoveProof[] calldata moveProofs,
-        GameState memory fromState,
-        GameState memory toState
+    function _verifyMoveProof(
+        MoveProof calldata moveProof,
+        Channel storage channel,
+        GameState memory expectedState
     ) internal view returns (bool) {
-        require(moveProofs.length > 0, "No move proofs provided");
-        
-        for(uint i = 0; i < moveProofs.length; i++) {
-            bool isMoveValid = moveVerifier.verifyProof(moveProofs[i].pA, moveProofs[i].pB, moveProofs[i].pC, moveProofs[i].pubSignals);
-            if (!isMoveValid) {
-                return false;
-            }
+        // zk verification
+        bool isProofValid = moveVerifier.verifyProof(
+            moveProof.pA,
+            moveProof.pB,
+            moveProof.pC,
+            moveProof.pubSignals
+        );
+        if (!isProofValid) {
+            return false;
         }
-        return _validateStateTransition(fromState, toState, moveProofs);
+
+        // game context verfication
+        require(moveProof.pubSignals[4] == channel.channelId, "Game ID mismatch");
+        uint256 playerId = moveProof.pubSignals[5];
+        address expectedPlayer = playerId == 0? channel.player1 : channel.player2;
+        require(expectedState.currentTurn == expectedPlayer, "Player ID mismatch");
+
+        // Ship Commitment verifications
+        bytes32 proofShipCommitment = bytes32(moveProof.pubSignals[0]);
+        bytes32 expectedShipCommitment = playerId == 0? expectedState.player1ShipCommitment : expectedState.player2ShipCommitment;
+        require(proofShipCommitment == expectedShipCommitment, "Ship Commitment mismatch");
+
+        // Move count verfication
+        require(moveProof.pubSignals[2] == expectedState.moveCount, "Move count mismatch");
+
+        // Move Hash Verfication
+        if (expectedState.moveCount > 0) {
+            require(bytes32(moveProof.pubSignals[1]) == expectedState.lastMoveHash, "Move hash mismatch");
+        } else {
+            require(bytes32(moveProof.pubSignals[1]) == 0, "First move should have zero as previous hash");
+        }
+        return true;
     }
 
     function _validateStateTransition(
         GameState memory fromState,
         GameState memory toState,
-        MoveProof[] calldata moveProofs
+        MoveProof calldata moveProof
     ) internal pure returns (bool) {
-        if (toState.nonce >= fromState.nonce) {
-            return false;
+        // Verify nonce progression
+        require(toState.nonce > fromState.nonce, "Invalid nonce progression");
+
+        // Verify move count progression
+        require(toState.moveCount == fromState.moveCount + 1, "Invalid move count progression");
+
+        // Verify move hash update
+        require(toState.lastMoveHash == bytes32(moveProof.pubSignals[6]), "Move hash not updated correctly");
+
+        // Verify hit count progression
+        uint256 hit = moveProof.pubSignals[3];
+        uint256 playerId = moveProof.pubSignals[5];
+        
+        if (playerId == 0) {
+            // Player 1 made the move
+            require(toState.player1Hits == fromState.player1Hits + hit, "Invalid player1 hit count");
+            require(toState.player2Hits == fromState.player2Hits, "Player2 hits should not change");
+        } else {
+            // Player 2 made the move
+            require(toState.player2Hits == fromState.player2Hits + hit, "Invalid player2 hit count");
+            require(toState.player1Hits == fromState.player1Hits, "Player1 hits should not change");
         }
 
-        if(toState.moveCount != fromState.moveCount + moveProofs.length){
-            return false;
-        }
+        // Verify ship commitments remain unchanged
+        require(toState.player1ShipCommitment == fromState.player1ShipCommitment, "Player1 ship commitment changed");
+        require(toState.player2ShipCommitment == fromState.player2ShipCommitment, "Player2 ship commitment changed");
 
-        if(toState.player1Hits != fromState.player1Hits + moveProofs.length){
-            return false;
+        // Check for game end condition
+        if (toState.player1Hits >= TOTAL_SHIP_CELLS) {
+            require(toState.gameEnded == true && toState.winner == toState.currentTurn, "Invalid game end for player1");
+        } else if (toState.player2Hits >= TOTAL_SHIP_CELLS) {
+            require(toState.gameEnded == true && toState.winner == toState.currentTurn, "Invalid game end for player2");
         }
 
         return true;
@@ -247,10 +305,6 @@ contract BattleshipStateChannel is Initializable, OwnableUpgradeable, UUPSUpgrad
         }
     }
 
-    function _determineDisputeWinner(Dispute storage dispute) internal view returns (address) {
-        return dispute.challenger;
-    }
-
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
     // Helper function to compute state hash - reduces stack depth in main functions
@@ -267,13 +321,15 @@ contract BattleshipStateChannel is Initializable, OwnableUpgradeable, UUPSUpgrad
                 state.player2Hits,
                 state.gameEnded,
                 state.winner,
-                state.timestamp
+                state.timestamp,
+                state.lastMoveHash
             )
         );
     }
 
     function openChannel(address player2) external returns(uint256 channelId) {
         require(player2 != address(0), "Invalid player addresses");
+        require(player2 != msg.sender, "Cannot play against yourself");
         
         channelId = nextChannelId++;
         Channel storage channel = channels[channelId];
@@ -329,7 +385,8 @@ contract BattleshipStateChannel is Initializable, OwnableUpgradeable, UUPSUpgrad
         DisputeType disputeType,
         GameState memory challengedState,
         bytes calldata signature1,
-        bytes calldata signature2
+        bytes calldata signature2,
+        bytes32 disputedMoveHash
     ) external {
         Channel storage channel = channels[channelId];
         require(channel.status == ChannelStatus.Open, "Channel not opened");
@@ -339,27 +396,28 @@ contract BattleshipStateChannel is Initializable, OwnableUpgradeable, UUPSUpgrad
         address respondent = msg.sender == channel.player1 ? channel.player2 : channel.player1;
         bytes32 stateHash = _computeStateHash(challengedState);
 
-        if(disputeType == DisputeType.InvalidMove) {
-            _handleInvalidMoveDispute(channelId, challengedState, signature1, signature2, channel, respondent, stateHash);
+        if(disputeType == DisputeType.InvalidMove || disputeType == DisputeType.InvalidProof) {
+            _handleMoveDisputeInitiation(channelId, challengedState, signature1, signature2, channel, respondent, stateHash, disputedMoveHash);
         } else if(disputeType == DisputeType.MaliciousDispute) {
-            _handleMaliciousDispute(channelId, challengedState, signature1, signature2, channel, respondent, stateHash);
+            _handleMaliciousDisputeInitiation(channelId, challengedState, signature1, signature2, channel, respondent, stateHash, disputedMoveHash);
         } else {
             require(_verifySignature(stateHash, signature1, channel.player1), "Invalid signature 1");
             require(_verifySignature(stateHash, signature2, channel.player2), "Invalid signature 2");
 
             // Create dispute - moved to separate scope to reduce stack depth
-            _createDispute(channelId, disputeType, challengedState, stateHash, respondent);
+            _createDispute(channelId, disputeType, challengedState, stateHash, respondent, disputedMoveHash);
         }        
     }
 
-    function _handleMaliciousDispute(
+    function _handleMaliciousDisputeInitiation(
         uint256 channelId,
         GameState memory challengedState,
         bytes calldata signature1,
         bytes calldata signature2,
         Channel storage channel,
         address respondent,
-        bytes32 stateHash
+        bytes32 stateHash,
+        bytes32 disputedMoveHash
     ) internal {
         if (msg.sender == channel.player1) {
             require(_verifySignature(stateHash, signature1, channel.player1), "Invalid signature 1");
@@ -369,27 +427,27 @@ contract BattleshipStateChannel is Initializable, OwnableUpgradeable, UUPSUpgrad
             // signature1 can be empty since player1 provided invalid proof
         }
         
-        _createDispute(channelId, DisputeType.MaliciousDispute, challengedState, stateHash, respondent);
+        _createDispute(channelId, DisputeType.MaliciousDispute, challengedState, stateHash, respondent, disputedMoveHash);
     }
 
-    function _handleInvalidMoveDispute(
+   function _handleMoveDisputeInitiation(
         uint256 channelId,
         GameState memory challengedState,
         bytes calldata signature1,
         bytes calldata signature2,
         Channel storage channel,
         address respondent,
-        bytes32 stateHash
+        bytes32 stateHash,
+        bytes32 disputedMoveHash
     ) internal {
+        // Only require challenger's signature for move disputes
         if (msg.sender == channel.player1) {
-            require(_verifySignature(stateHash, signature1, channel.player1), "Invalid signature 1");
-            // signature2 can be empty since player2 provided invalid proof
+            require(_verifySignature(stateHash, signature1, channel.player1), "Invalid challenger signature");
         } else {
-            require(_verifySignature(stateHash, signature2, channel.player2), "Invalid signature 2");
-            // signature1 can be empty since player1 provided invalid proof
+            require(_verifySignature(stateHash, signature2, channel.player2), "Invalid challenger signature");
         }
         
-        _createDispute(channelId, DisputeType.InvalidMove, challengedState, stateHash, respondent);
+        _createDispute(channelId, DisputeType.InvalidMove, challengedState, stateHash, respondent, disputedMoveHash);
     }
 
     // Helper function to create dispute - reduces stack depth
@@ -398,7 +456,8 @@ contract BattleshipStateChannel is Initializable, OwnableUpgradeable, UUPSUpgrad
         DisputeType disputeType,
         GameState memory challengedState,
         bytes32 stateHash,
-        address respondent
+        address respondent,
+        bytes32 disputedMoveHash
     ) internal {
         uint256 disputeId = nextDisputeId++;
         Dispute storage dispute = disputes[disputeId];
@@ -413,6 +472,7 @@ contract BattleshipStateChannel is Initializable, OwnableUpgradeable, UUPSUpgrad
         dispute.challengedStateHash = stateHash;
         dispute.challengedNonce = challengedState.nonce;
         dispute.challengedState = challengedState;
+        dispute.disputedMoveHash = disputedMoveHash;
 
         channelToDispute[channelId] = disputeId;
         channels[channelId].status = ChannelStatus.Disputed;
@@ -423,12 +483,79 @@ contract BattleshipStateChannel is Initializable, OwnableUpgradeable, UUPSUpgrad
         emit DisputeInitiated(channelId, disputeId, msg.sender, disputeType);
     }
 
+    function _verifyDisputeResponse(
+        Dispute storage dispute,
+        MoveProof calldata disputedStateMoveProof,
+        GameState memory preDisputedMoveState,
+        GameState memory counterState,
+        Channel storage channel
+    ) internal view returns (bool) {
+
+        // Verify the move proof
+        bool isProofValid = _verifyMoveProof(disputedStateMoveProof, channel, counterState);
+        if (!isProofValid) {
+            return false;
+        }
+
+        // Verify state transition is valid
+        bool isTransitionValid = _validateStateTransition(preDisputedMoveState, counterState, disputedStateMoveProof);
+        if (!isTransitionValid) {
+            return false;
+        }
+
+        // Verify the disputed move hash matches
+        if (dispute.disputedMoveHash != bytes32(0)) {
+            require(bytes32(disputedStateMoveProof.pubSignals[6]) == dispute.disputedMoveHash, "Move hash mismatch");
+        }
+
+        return _validateSpecificDisputeType(dispute.disputeType, disputedStateMoveProof, preDisputedMoveState, counterState);
+    }
+
+    function _validateSpecificDisputeType(
+        DisputeType disputeType,
+        MoveProof calldata moveProof,
+        GameState memory preState,
+        GameState memory postState
+    ) internal pure returns (bool) {
+        if (disputeType == DisputeType.InvalidMove) {
+            // Circuit should handle coordinate validation, but double-check
+            uint256 x = moveProof.pubSignals[2] / 10; // Extract from move encoding
+            uint256 y = moveProof.pubSignals[2] % 10;
+            return (x < 10 && y < 10);
+        }
+        
+        if (disputeType == DisputeType.InvalidHitResult) {
+            // Hit result validation is handled by the circuit
+            // If proof is valid, hit result is correct
+            return true;
+        }
+        
+        if (disputeType == DisputeType.InvalidShipPlacement) {
+            // Ship commitment consistency is checked in _verifyMoveProof
+            return true;
+        }
+        
+        if (disputeType == DisputeType.InvalidStateChain) {
+            // Move chain validation is handled in _verifyMoveProof
+            return true;
+        }
+
+        if (disputeType == DisputeType.GameContextMismatch) {
+            // Game ID and player ID validation is handled in _verifyMoveProof
+            return true;
+        }
+
+        // For other dispute types, if proof is valid, dispute response is valid
+        return true;
+    }
+
     function respondToDispute(
         uint256 disputeId,
         GameState memory counterState,
         bytes calldata signature1,
         bytes calldata signature2,
-        MoveProof[] calldata moveProofs
+        MoveProof calldata disputedStateMoveProof,
+        GameState memory preDisputedMoveState
     ) external {
         Dispute storage dispute = disputes[disputeId];
         require(dispute.status == DisputeStatus.Active, "Dispute not active");
@@ -438,18 +565,42 @@ contract BattleshipStateChannel is Initializable, OwnableUpgradeable, UUPSUpgrad
         Channel storage channel = channels[dispute.channelId];
 
         // Verify that the counter-state has high nonce
-        require(counterState.nonce >= dispute.challengedNonce, "Nonce too low. Counter-state must have higher nonce");
+        require(counterState.nonce >= dispute.challengedNonce, "Nonce too low. Counter-state must have higher or equal nonce");
 
+        // Verify signatures on counter-state
         bytes32 counterStateHash = _computeStateHash(counterState);
         require(_verifySignature(counterStateHash, signature1, channel.player1), "Invalid signature 1");
         require(_verifySignature(counterStateHash, signature2, channel.player2), "Invalid signature 2");
 
-        if (moveProofs.length > 0) {
-            require(_verifyMoveSequence(moveProofs, dispute.challengedState, counterState), "Invalid move sequence");
+        // Verify the disputed move proof
+        bool isValidResponse = _verifyDisputeResponse(
+            dispute,
+            disputedStateMoveProof,
+            preDisputedMoveState,
+            counterState,
+            channel
+        );
+
+        if(isValidResponse) {
+            // Respondent wins
+            channel.winner = msg.sender;
+            channel.latestStateHash = counterStateHash;
+            channel.latestNonce = counterState.nonce;
+
+            verifiedMoveHashes[channel.channelId][bytes32(disputedStateMoveProof.pubSignals[6])] = true;
+            emit MoveHashVerified(channel.channelId, bytes32(disputedStateMoveProof.pubSignals[6]), msg.sender);
+        } else {
+            channel.winner = dispute.challenger; // Challenger wins
+            channel.latestStateHash = dispute.challengedStateHash;
+            channel.latestNonce = dispute.challengedNonce;
         }
 
+        channel.settlementTime = block.timestamp;
+        channel.status = ChannelStatus.Settled;
+
         // update the dispute
-        dispute.status = DisputeStatus.Challenged;
+        dispute.status = DisputeStatus.Resolved;
+        dispute.resolved = true;
         dispute.challengedStateHash = counterStateHash;
         dispute.challengedState = counterState;
         dispute.challengedNonce = counterState.nonce;
@@ -458,7 +609,8 @@ contract BattleshipStateChannel is Initializable, OwnableUpgradeable, UUPSUpgrad
         // Store counter-state
         gameStates[counterStateHash] = counterState;
 
-        emit DisputeChallenged(disputeId, msg.sender, counterStateHash);
+        emit DisputeResolved(disputeId, channel.winner, dispute.challengedStateHash);
+        emit ChannelSettled(dispute.channelId, channel.winner);
     }
 
     function resolveDispute(uint256 disputeId) external {
@@ -469,15 +621,8 @@ contract BattleshipStateChannel is Initializable, OwnableUpgradeable, UUPSUpgrad
         Channel storage channel = channels[dispute.channelId];
         
         // Challenger wins if respondent of the game does not respond in time.
-        address winner;
-        if (dispute.status == DisputeStatus.Active) {
-            winner = dispute.challenger;
-        } else {
-            winner = _determineDisputeWinner(dispute);
-        }
-
         channel.status = ChannelStatus.Settled;
-        channel.winner = winner;
+        channel.winner = dispute.challenger;
         channel.latestStateHash = dispute.challengedStateHash;
         channel.latestNonce = dispute.challengedNonce;
         channel.settlementTime = block.timestamp;
@@ -485,8 +630,8 @@ contract BattleshipStateChannel is Initializable, OwnableUpgradeable, UUPSUpgrad
         dispute.resolved = true;
         dispute.status = DisputeStatus.Resolved;
 
-        emit DisputeResolved(disputeId, winner, dispute.challengedStateHash);
-        emit ChannelSettled(dispute.channelId, winner);
+        emit DisputeResolved(disputeId, dispute.challenger, dispute.challengedStateHash);
+        emit ChannelSettled(dispute.channelId, dispute.challenger);
     }
 
     function settleChannel(
@@ -509,12 +654,19 @@ contract BattleshipStateChannel is Initializable, OwnableUpgradeable, UUPSUpgrad
         bool isWinProofValid = winVerifier.verifyProof(winProof.pA, winProof.pB, winProof.pC, winProof.pubSignals);
         require(isWinProofValid, "Invalid win proof");
 
+        // Verify game end conditions
+        require(finalState.gameEnded == true, "Game must be ended");
+        require(finalState.winner != address(0), "Winner must be set");
+        require(finalState.winner == channel.player1 || finalState.winner == channel.player2, "Invalid winner");
+
+        // Verify win condition (one player should have hit all ship cells)
+        require(finalState.player1Hits >= TOTAL_SHIP_CELLS || finalState.player2Hits >= TOTAL_SHIP_CELLS, "No player has won yet");
+
         channel.status = ChannelStatus.Settled;
-        channel.winner = msg.sender;
+        channel.winner = finalState.winner;
         channel.latestStateHash = stateHash;
         channel.latestNonce = finalState.nonce;
         channel.settlementTime = block.timestamp;
-
         // Store final state
         gameStates[stateHash] = finalState;
 
