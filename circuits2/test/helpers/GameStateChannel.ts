@@ -63,6 +63,7 @@ interface GameStateSmartContract {
     gameEnded:       boolean;
     winner:          string;   // address
     timestamp:       number;   // uint256 (block-time analogue)
+    lastMoveHash:    number;   // uint256
 }
 
 interface MovesData {
@@ -89,7 +90,7 @@ interface GameState {
     gameEnded:       boolean;
     winner:          string;   // address
     timestamp:       number;   // uint256 (block-time analogue)
-
+    lastMoveHash:    number;   // uint256
     // items to be kept locally but not to hash
     gameId: string;
     wakuRoomId: string;
@@ -130,7 +131,7 @@ export class GameStateChannel {
     private shipSizes: number[];
     private chainId: number;
     private contractAddress: string;
-    DisputeType: { InvalidMove: number; InvalidShipPlacement: number; GameEnd: number; Timeout: number };
+    DisputeType: { InvalidMove:number, InvalidShipPlacement:number, InvalidHitResult:number, ReusedMove:number, InvalidProof:number, MaliciousDispute:number, InvalidStateChain:number, GameContextMismatch:number };
 
     constructor(wakuRoomId: string, signer: ethers.Signer, chainId: number, contractAddress: string, localPlayerRole: 'initiator' | 'challenger') {
         this.gameState = {
@@ -151,6 +152,7 @@ export class GameStateChannel {
             player2: "",
             winner: ethers.ZeroAddress,
             localPlayerRole: localPlayerRole,
+            lastMoveHash: 0,
             movesData: []
         };
         this.signer = signer;
@@ -160,10 +162,7 @@ export class GameStateChannel {
         this.chainId = chainId;
         this.contractAddress = contractAddress;
         this.DisputeType = {
-            InvalidMove: 0,
-            InvalidShipPlacement: 1,
-            GameEnd: 2,
-            Timeout: 3
+            InvalidMove:0, InvalidShipPlacement:1, InvalidHitResult:2, ReusedMove:3, InvalidProof:4, MaliciousDispute:5, InvalidStateChain:6, GameContextMismatch:7
         };
     }
     
@@ -189,33 +188,6 @@ export class GameStateChannel {
         listeners.forEach(callback => callback(data));
     }
 
-    // private hashMoves(): string {
-    //     if (!this.gameState || this.gameState.moves.length === 0) {
-    //         return ethers.ZeroHash;
-    //     }
-
-    //     // creating a hash of all moves
-    //     const movesData = this.gameState.moves.map(move => ({
-    //         x: move.x,
-    //         y: move.y,
-    //         isHit: move.isHit,
-    //         timestamp: move.timestamp
-    //     }));
-
-    //     movesData.sort((a, b) => a.timestamp - b.timestamp);
-    //     const types = ['uint8', 'uint8', 'bool', 'uint256'];
-    //     let combinedHash = ethers.ZeroHash;
-
-    //     for(const move of movesData) {
-    //         const values = [move.x, move.y, move.isHit, move.timestamp];
-    //         const moveHash = ethers.solidityPackedKeccak256(types, values);
-
-    //         combinedHash = ethers.solidityPackedKeccak256(['bytes32', 'bytes32'], [combinedHash, moveHash]);
-    //     }
-
-    //     return combinedHash;
-    // }
-
     private async computeStateHash(): Promise<string> {
         if (!this.gameState) throw new GameStateChannelError("Game state not initialized");
         
@@ -239,7 +211,8 @@ export class GameStateChannel {
                 { name: "player2Hits", type: "uint8" },
                 { name: "gameEnded", type: "bool" },
                 { name: "winner", type: "address" },
-                { name: "timestamp", type: "uint256" }
+                { name: "timestamp", type: "uint256" },
+                { name: "lastMoveHash", type: "uint256" }
             ]
         };
     
@@ -253,7 +226,8 @@ export class GameStateChannel {
             player2Hits: this.gameState.player2Hits,
             gameEnded: this.gameState.gameEnded,
             winner: this.gameState.winner ?? ethers.ZeroAddress,
-            timestamp: this.gameState.timestamp
+            timestamp: this.gameState.timestamp,
+            lastMoveHash: this.gameState.lastMoveHash ?? 0
         };
          
         // // 4. Sign the typed data using EIP-712
@@ -286,7 +260,8 @@ export class GameStateChannel {
                 { name: "player2Hits", type: "uint8" },
                 { name: "gameEnded", type: "bool" },
                 { name: "winner", type: "address" },
-                { name: "timestamp", type: "uint256" }
+                { name: "timestamp", type: "uint256" },
+                { name: "lastMoveHash", type: "uint256" }
             ]
         };
     
@@ -300,7 +275,8 @@ export class GameStateChannel {
             player2Hits: opponentGameState.player2Hits,
             gameEnded: opponentGameState.gameEnded,
             winner: opponentGameState.winner ?? ethers.ZeroAddress,
-            timestamp: opponentGameState.timestamp
+            timestamp: opponentGameState.timestamp,
+            lastMoveHash: opponentGameState.lastMoveHash ?? 0
         };
          
         // 4. Sign the typed data using EIP-712
@@ -316,6 +292,13 @@ export class GameStateChannel {
 
         const signature: string = await this._computeOpponentGameStateHash(challengedGameState);
         return signature;
+    }
+
+    updateLatestMoveHash(moveHash: number) {
+        if(!this.gameState) {
+            throw new GameStateChannelError("Game state not available");
+        }
+        this.gameState.lastMoveHash = moveHash;
     }
 
     async signGameState(): Promise<{hash: string, signature: string}> {
@@ -344,7 +327,8 @@ export class GameStateChannel {
                 { name: "player2Hits", type: "uint8" },
                 { name: "gameEnded", type: "bool" },
                 { name: "winner", type: "address" },
-                { name: "timestamp", type: "uint256" }
+                { name: "timestamp", type: "uint256" },
+                { name: "lastMoveHash", type: "uint256" }
             ]
         };
     
@@ -358,7 +342,8 @@ export class GameStateChannel {
             player2Hits: this.gameState.player2Hits,
             gameEnded: this.gameState.gameEnded,
             winner: this.gameState.winner ?? ethers.ZeroAddress,
-            timestamp: this.gameState.timestamp
+            timestamp: this.gameState.timestamp,
+            lastMoveHash: this.gameState.lastMoveHash ?? 0
         };
          
         // 4. Sign the typed data using EIP-712
@@ -390,7 +375,8 @@ export class GameStateChannel {
                     { name: "player2Hits", type: "uint8" },
                     { name: "gameEnded", type: "bool" },
                     { name: "winner", type: "address" },
-                    { name: "timestamp", type: "uint256" }
+                    { name: "timestamp", type: "uint256" },
+                    { name: "lastMoveHash", type: "uint256" }
                 ]
             };
 
@@ -404,7 +390,8 @@ export class GameStateChannel {
                 player2Hits: gameState.player2Hits,
                 gameEnded: gameState.gameEnded,
                 winner: gameState.winner ?? ethers.ZeroAddress,
-                timestamp: gameState.timestamp
+                timestamp: gameState.timestamp,
+                lastMoveHash: gameState.lastMoveHash ?? ethers.ZeroHash
             };
 
             
@@ -454,13 +441,13 @@ export class GameStateChannel {
             throw new GameStateChannelError("Game state not initialized");
         }
 
-        if (this.gameState.winner !== ethers.ZeroAddress) {
-            throw new GameStateChannelError("Winner already declared");
-        }
+        // if (this.gameState.winner !== ethers.ZeroAddress) {
+        //     throw new GameStateChannelError("Winner already declared");
+        // }
 
-        if (this.gameState.gameEnded) {
-            throw new GameStateChannelError("Game already ended");
-        }
+        // if (this.gameState.gameEnded) {
+        //     throw new GameStateChannelError("Game already ended");
+        // }
 
         try{
             this.gameState.movesData.push(movesData);
@@ -476,9 +463,9 @@ export class GameStateChannel {
             throw new GameStateChannelError("Game state not initialized");
         }
 
-        if (this.gameState.winner !== ethers.ZeroAddress) {
-            throw new GameStateChannelError("Winner already declared");
-        }
+        // if (this.gameState.winner !== ethers.ZeroAddress) {
+        //     throw new GameStateChannelError("Winner already declared");
+        // }
 
         // Validate winner
         if (winner !== this.gameState.player1 && winner !== this.gameState.player2) {
@@ -492,7 +479,7 @@ export class GameStateChannel {
         }
 
         this.gameState.winner = winner;
-        this.gameState.nonce++;
+        this.gameState.gameEnded = true;
 
         const {hash, signature} = await this.signGameState();
         this.emit('gameEnded', { winner, gameState: this.gameState, signature: signature, hash: hash });
@@ -561,7 +548,8 @@ export class GameStateChannel {
                     { name: "player2Hits", type: "uint8" },
                     { name: "gameEnded", type: "bool" },
                     { name: "winner", type: "address" },
-                    { name: "timestamp", type: "uint256" }
+                    { name: "timestamp", type: "uint256" },
+                    { name: "lastMoveHash", type: "uint256" }
                 ]
             };
     
@@ -575,7 +563,8 @@ export class GameStateChannel {
                 player2Hits: this.gameState.player2Hits,
                 gameEnded: this.gameState.gameEnded,
                 winner: this.gameState.winner ?? ethers.ZeroAddress,
-                timestamp: this.gameState.timestamp
+                timestamp: this.gameState.timestamp,
+                lastMoveHash: this.gameState.lastMoveHash ?? 0
             };
     
             // Recover the address from the EIP-712 signature
@@ -1180,13 +1169,13 @@ export class GameStateChannel {
             throw new GameStateChannelError("Game state not initialized!");
         }
     
-        if (this.gameState.gameEnded) { 
-            throw new InvalidMoveError("Game is already finished");
-        }
+        // if (this.gameState.gameEnded) { 
+        //     throw new InvalidMoveError("Game is already finished");
+        // }
     
-        if (this.gameState.winner !== ethers.ZeroAddress) {
-            throw new InvalidMoveError("Winner already declared");
-        }
+        // if (this.gameState.winner !== ethers.ZeroAddress) {
+        //     throw new InvalidMoveError("Winner already declared");
+        // }
     
         try{
             this.gameState.currentTurn = this.gameState.currentTurn === this.gameState.player1 ? this.gameState.player2 : this.gameState.player1;
@@ -1208,18 +1197,15 @@ export class GameStateChannel {
             throw new InvalidMoveError("Game is already finished");
         }
     
-        if(this.gameState.currentTurn !== (this.gameState.localPlayerRole === "initiator" ? this.gameState.player1 : this.gameState.player2)) {
-            throw new InvalidMoveError("Not your turn");
-        }
+        // if(this.gameState.currentTurn !== (this.gameState.localPlayerRole === "initiator" ? this.gameState.player1 : this.gameState.player2)) {
+        //     throw new InvalidMoveError("Not your turn");
+        // }
     
         if (this.gameState.winner !== ethers.ZeroAddress) {
             throw new InvalidMoveError("Winner already declared");
         }
         
         try{
-            // if (!this.validateMoveProof(moveProof, moveProofPublicData, move)) {
-            //     throw new InvalidMoveError("Invalid move proof");
-            // }
         
             // update the game states
             this.gameState.nonce++;
@@ -1235,16 +1221,18 @@ export class GameStateChannel {
                     this.gameState.player2Hits++;
                 }
             }
-        
-            const {hash, signature} = await this.signGameState();
-            this.gameState.stateHash = hash;
-            this.emit('moveMade', { playerRole: this.gameState.localPlayerRole , move, gameState: this.gameState, signature, hash });
-        
+
             // Check for win condition (12 total ship cells)
             if (this.gameState.player1Hits === 12 || this.gameState.player2Hits === 12) {
                 winnerFound = true;
                 winner = this.gameState.currentTurn;
+                this.gameState.gameEnded = true;
+                this.gameState.winner = this.gameState.currentTurn;
             }
+        
+            const {hash, signature} = await this.signGameState();
+            this.gameState.stateHash = hash;
+            this.emit('moveMade', { playerRole: this.gameState.localPlayerRole , move, gameState: this.gameState, signature, hash });
         
             return {signature, winnerFound, winner, hash};
         }catch(error) {

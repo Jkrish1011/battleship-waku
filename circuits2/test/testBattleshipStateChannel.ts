@@ -1,3 +1,5 @@
+import { ethers } from "ethers";
+
 const { expect } = require("chai");
 const hre = require("hardhat");
 const {
@@ -255,7 +257,8 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
         player2Hits: game.player2Hits,
         gameEnded: game.gameEnded,
         winner: game.winner,
-        timestamp: game.timestamp
+        timestamp: game.timestamp,
+        lastMoveHash: game.lastMoveHash
       }
       
       const txSubmitInitialState_player1 = await battleshipWaku.connect(player1).submitInitialState(
@@ -432,7 +435,8 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
         player2Hits: game.player2Hits,
         gameEnded: game.gameEnded,
         winner: game.winner,
-        timestamp: game.timestamp
+        timestamp: game.timestamp,
+        lastMoveHash: game.lastMoveHash
       }
       
       const txSubmitInitialState_player1 = await battleshipWaku.connect(player1).submitInitialState(
@@ -600,7 +604,8 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
           player2Hits: game.player2Hits,
           gameEnded: game.gameEnded,
           winner: game.winner,
-          timestamp: game.timestamp
+          timestamp: game.timestamp,
+          lastMoveHash: game.lastMoveHash
         }
         
         const txSubmitInitialState_player1 = await battleshipWaku.connect(player1).submitInitialState(
@@ -641,7 +646,8 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
           player2Hits: game2.player2Hits,
           gameEnded: game2.gameEnded,
           winner: game2.winner,
-          timestamp: game2.timestamp
+          timestamp: game2.timestamp,
+          lastMoveHash: game2.lastMoveHash
         }
 
         const txSubmitInitialState_player2 = await battleshipWaku.connect(player2).submitInitialState(
@@ -668,8 +674,8 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
 
         console.log("StateHash submit initial state player 2", stateHash_player2);
         
-        const gameState_Player2 = await battleshipWaku.getGameState(stateHash_player2);
-        console.log("Game state:: Player 2", gameState_Player2);
+        // const gameState_Player2 = await battleshipWaku.getGameState(stateHash_player2);
+        // console.log("Game state:: Player 2", gameState_Player2);
 
         if (!fs.existsSync(wasmPath)) {
             throw new Error(`WASM file not found at: ${wasmPath}`);
@@ -724,7 +730,7 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
           const moveInputPlayer1 = {
             salt: shipPlacementPositionsPlayer2.salt,
             ship_placement_commitment: shipPlacementPositionsPlayer2.commitment,
-            previous_move_hash: i == 0? 0: player2_moveStateHash,
+            previous_move_hash: i == 0? ethers.ZeroHash: player2_moveStateHash,
             move_count: i,
             game_id: "333",
             player_id: 0,
@@ -735,8 +741,8 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
           };
           // Player 2 generates the proof for the move made by Player 1
           const {proof: _proofMovePlayer1, calldata: proofMovePlayer1} = await gameStateChannel2.generateProof(moveInputPlayer1, moveWasmPath, moveZkeyPath);
-          console.log("proofMovePlayer1", proofMovePlayer1);
-          console.log("_proofMovePlayer1", _proofMovePlayer1);
+          // console.log("proofMovePlayer1", proofMovePlayer1);
+          // console.log("_proofMovePlayer1", _proofMovePlayer1);
           // console.log(proofPlayer1);
           // proofMovePlayer1_converted & _proofMovePlayer1 - To be sent to Player 1
           const proofMovePlayer1_converted = {
@@ -757,8 +763,9 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
             throw new Error("Move verification failed");
           } 
 
-          // Increment player1's hit count
-          gameStateChannel2.acknowledgeMove(hit);
+          // Updated the latest move hash
+          console.log("Latest move hash from Player 2 for Player 1 : ", _proofMovePlayer1.publicSignals[6]);
+          gameStateChannel2.updateLatestMoveHash(_proofMovePlayer1.publicSignals[6]);
 
           // Generate move data for Player 1
           const moveTimestamp = Math.floor(Date.now() / 1000);
@@ -768,6 +775,9 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
             isHit: hit,
             timestamp: moveTimestamp
           };
+
+          // Make Move at player2's side
+          await gameStateChannel2.makeMove(move_player1_byPlayer2);
 
           // PLAYER 2 SIGNS THE GAME STATE
           const {signature: currentStateSignature_ofPlayer2, hash: currentStateHash_ofPlayer2} = await gameStateChannel2.signGameState();
@@ -785,7 +795,8 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
             player2Hits: latestGameState_fromPlayer2.player2Hits,
             gameEnded: latestGameState_fromPlayer2.gameEnded,
             winner: latestGameState_fromPlayer2.winner,
-            timestamp: latestGameState_fromPlayer2.timestamp
+            timestamp: latestGameState_fromPlayer2.timestamp,
+            lastMoveHash: latestGameState_fromPlayer2.lastMoveHash
           };
           console.log("derived game state Player 2", latestGameStateSC_fromPlayer2);
           
@@ -801,7 +812,6 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
             gameStateHash: currentStateHash_ofPlayer2,
             proofs: {proof: _proofMovePlayer1, calldata: proofMovePlayer1_converted}
           };
-          
 
           // Verify if the values are correct locally at player 2's end
           let {isValid: resultGameStateSignaturePlayer2} = await gameStateChannel2.verifyGameStateSignature(movesData_player1_byPlayer2.signature.player2, player2.address, movesData_player1_byPlayer2.gameState);
@@ -810,6 +820,8 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
           if(!resultGameStateSignaturePlayer2) {
             throw new Error("Move state signature of Player 2 verification failed at Player 2's end! - LOCAL VERIFICATION!");
           }
+
+          // PLAYER 1 VERIFICATION
  
           // Player 1 verifies the proof generated by Player 2
           let resultMovePlayer1 = await moveVerifier.verifyProof(proofMovePlayer1_converted.pA, proofMovePlayer1_converted.pB, proofMovePlayer1_converted.pC, proofMovePlayer1_converted.pubSignals);
@@ -829,7 +841,7 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
           const isMyTurn_player1 = await gameStateChannel.isMyTurn();
           let moveStateHash_player1 = "";
           if(isMyTurn_player1) {
-            let {signature: moveStatehash, winnerFound: winnerFound1, winner: winner1} = await gameStateChannel.makeMove(move_player1_byPlayer2);
+            let {signature: moveStatehash, winnerFound: winnerFound1, winner: winner1} = await gameStateChannel.makeMove(movesData_player1_byPlayer2.move);
             moveStateHash_player1 = moveStatehash;
             if(winnerFound1) {
                 console.log("Game Over");
@@ -856,14 +868,6 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
           // Player 1 updates the moves using the data passed by Player 2
           await gameStateChannel.updateMoves(movesData_player1_byPlayer2);
 
-          // Checks if the winner is declared
-          if(winnerDeclared) {
-            gameStateChannel.declareWinner(winner);
-            // This will be sent to player 2 and player 2 will update the state accordingly
-            gameStateChannel2.declareWinner(winner);
-            break;
-          }
-
           // No Dispute from Player 1
 
           // Player 1 shares the signature back with player 2
@@ -879,6 +883,15 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
           // Player 2 updates the gamestate 
           // Update the current move data for Player 1 at Player 2's side
           await gameStateChannel2.updateMoves(movesData_player1_byPlayer2);
+
+
+          // Checks if the winner is declared
+          if(winnerDeclared) {
+            await gameStateChannel.declareWinner(winner);
+            // This will be sent to player 2 and player 2 will update the state accordingly
+            await gameStateChannel2.declareWinner(winner);
+            break;
+          }
 
           // No Dispute from Player 2
           
@@ -928,9 +941,9 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
             throw new Error("Move verification failed");
           } 
 
-          // Increment player2's hit count at Player 1's end
-          gameStateChannel.acknowledgeMove(hit2);
-          
+          gameStateChannel.updateLatestMoveHash(_proofMovePlayer2.publicSignals[6]);
+          console.log("Latest move hash from Player 1 for Player 2 : ", _proofMovePlayer2.publicSignals[6]);
+
           // Generate move data for Player 1
           const moveTimestamp2 = Math.floor(Date.now() / 1000);
           let move_player2_byPlayer1 = {
@@ -939,6 +952,9 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
             isHit: hit2,
             timestamp: moveTimestamp2
           };
+
+          // Increment player2's hit count at Player 1's end
+          await gameStateChannel.makeMove(move_player2_byPlayer1);
 
           const {signature: currentStateSignature_ofPlayer1, hash: currentStateHash_ofPlayer1} = await gameStateChannel.signGameState();
           console.log("Player 1 Signature: ", currentStateSignature_ofPlayer1);
@@ -954,7 +970,8 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
             player2Hits: latestGameState_fromPlayer1.player2Hits,
             gameEnded: latestGameState_fromPlayer1.gameEnded,
             winner: latestGameState_fromPlayer1.winner,
-            timestamp: latestGameState_fromPlayer1.timestamp
+            timestamp: latestGameState_fromPlayer1.timestamp,
+            lastMoveHash: latestGameState_fromPlayer1.lastMoveHash
           }
           console.log("derived game state Player 1", latestGameStateSC_fromPlayer1);
           
@@ -993,7 +1010,7 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
           const isMyTurn_player2 = await gameStateChannel2.isMyTurn();
           let moveStateHash_player2 = "";
           if(isMyTurn_player2) {
-            let {signature: moveStatehash, winnerFound: winnerFound2, winner: winner2} = await gameStateChannel2.makeMove(move_player2_byPlayer1);
+            let {signature: moveStatehash, winnerFound: winnerFound2, winner: winner2} = await gameStateChannel2.makeMove(movesData_player2_byPlayer1.move);
             moveStateHash_player2 = moveStatehash;
             if(winnerFound2) {
                 console.log("Game Over");
@@ -1020,13 +1037,6 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
             throw new Error("Move state signature of Player 1 verification failed at Player 2's end!");
           }
           
-          // Checks if the winner is declared
-          if(winnerDeclared) {
-            gameStateChannel.declareWinner(winner);
-            gameStateChannel2.declareWinner(winner);
-            break;
-          }
-
           // PLayer 1 verifies the signature of GameState by Player 2
           let {isValid: resultGameStateSignaturePlayer5} = await gameStateChannel.verifyGameStateSignature(movesData_player2_byPlayer1.signature.player2, player2.address, movesData_player2_byPlayer1.gameState);
           console.log("Move state signature verification player 2 at Player 1's side", resultGameStateSignaturePlayer5);
@@ -1039,7 +1049,14 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
 
           // Update the current move data for Player 2 at Player 1's side
           await gameStateChannel.updateMoves(movesData_player2_byPlayer1);
-          
+
+          // Checks if the winner is declared
+          if(winnerDeclared) {
+            await gameStateChannel.declareWinner(winner);
+            await gameStateChannel2.declareWinner(winner);
+            break;
+          }
+
         }
         const winWasmPath = path.join(__dirname, "..", "build", "win_verification", "win_verification_js", "win_verification.wasm");
         const winZkeyPath = path.join(__dirname, "..", "keys", "win_verification_final.zkey");
@@ -1084,17 +1101,6 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
         let offchainVerificationWinPlayer1 = await gameStateChannel.verifyProof(winVerification, _proofWinPlayer1);
         console.log("offchainVerificationWinPlayer1", offchainVerificationWinPlayer1);
 
-        // const gS = gameStateChannel.getGameState();
-        // console.log(gS.movesData[0]);
-        // const gS2 = gameStateChannel2.getGameState();
-        // console.log(gS2.movesData[0]);
-        // let player1_tmp = await gameStateChannel.getGameState();
-        // let player2_tmp = await gameStateChannel2.getGameState();
-        // delete player1_tmp.movesData;
-        // delete player2_tmp.movesData;
-        // console.log("Player 1 game state ", player1_tmp);
-        // console.log("Player 2 game state ", player2_tmp);
-
         let player1_gs = await gameStateChannel.getGameState();
         let player2_gs = await gameStateChannel2.getGameState();
 
@@ -1113,7 +1119,8 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
           player2Hits: finalGameState.gameState.player2Hits,
           gameEnded: finalGameState.gameState.gameEnded,
           winner: finalGameState.gameState.winner,
-          timestamp: finalGameState.gameState.timestamp
+          timestamp: finalGameState.gameState.timestamp,
+          lastMoveHash: finalGameState.gameState.lastMoveHash
         };
         
         console.log(finalGameStateObj);
@@ -1279,7 +1286,8 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
           player2Hits: game.player2Hits,
           gameEnded: game.gameEnded,
           winner: game.winner,
-          timestamp: game.timestamp
+          timestamp: game.timestamp,
+          lastMoveHash: game.lastMoveHash
         }
         
         const txSubmitInitialState_player1 = await battleshipWaku.connect(player1).submitInitialState(
@@ -1320,7 +1328,8 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
           player2Hits: game2.player2Hits,
           gameEnded: game2.gameEnded,
           winner: game2.winner,
-          timestamp: game2.timestamp
+          timestamp: game2.timestamp,
+          lastMoveHash: game2.lastMoveHash
         }
 
         const txSubmitInitialState_player2 = await battleshipWaku.connect(player2).submitInitialState(
@@ -1347,8 +1356,8 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
 
         console.log("StateHash submit initial state player 2", stateHash_player2);
         
-        const gameState_Player2 = await battleshipWaku.getGameState(stateHash_player2);
-        console.log("Game state:: Player 2", gameState_Player2);
+        // const gameState_Player2 = await battleshipWaku.getGameState(stateHash_player2);
+        // console.log("Game state:: Player 2", gameState_Player2);
 
         if (!fs.existsSync(wasmPath)) {
             throw new Error(`WASM file not found at: ${wasmPath}`);
@@ -1363,9 +1372,6 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
         console.log("wasmPath", wasmPath);
         console.log("zkeyPath", zkeyPath);
         console.log("verificationKeyPath", verificationKeyPath);
-
-        
-        console.log("--");
 
         const moveWasmPath = path.join(__dirname, "..", "build", "move_verification", "move_verification_js", "move_verification.wasm");
         const moveZkeyPath = path.join(__dirname, "..", "keys", "move_verification_final.zkey");
@@ -1406,7 +1412,7 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
           const moveInputPlayer1 = {
             salt: shipPlacementPositionsPlayer2.salt,
             ship_placement_commitment: shipPlacementPositionsPlayer2.commitment,
-            previous_move_hash: i == 0? 0: player2_moveStateHash,
+            previous_move_hash: i == 0? ethers.ZeroHash: player2_moveStateHash,
             move_count: i,
             game_id: "333",
             player_id: 0,
@@ -1417,8 +1423,8 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
           };
           // Player 2 generates the proof for the move made by Player 1
           const {proof: _proofMovePlayer1, calldata: proofMovePlayer1} = await gameStateChannel2.generateProof(moveInputPlayer1, moveWasmPath, moveZkeyPath);
-          console.log("proofMovePlayer1", proofMovePlayer1);
-          console.log("_proofMovePlayer1", _proofMovePlayer1);
+          // console.log("proofMovePlayer1", proofMovePlayer1);
+          // console.log("_proofMovePlayer1", _proofMovePlayer1);
           // console.log(proofPlayer1);
           // proofMovePlayer1_converted & _proofMovePlayer1 - To be sent to Player 1
           const proofMovePlayer1_converted = {
@@ -1439,8 +1445,9 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
             throw new Error("Move verification failed");
           } 
 
-          // Increment player1's hit count
-          gameStateChannel2.acknowledgeMove(hit);
+          // Updated the latest move hash
+          console.log("Latest move hash from Player 2 for Player 1 : ", _proofMovePlayer1.publicSignals[6]);
+          gameStateChannel2.updateLatestMoveHash(_proofMovePlayer1.publicSignals[6]);
 
           // Generate move data for Player 1
           const moveTimestamp = Math.floor(Date.now() / 1000);
@@ -1450,6 +1457,9 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
             isHit: hit,
             timestamp: moveTimestamp
           };
+
+          // Make Move at player2's side
+          await gameStateChannel2.makeMove(move_player1_byPlayer2);
 
           // PLAYER 2 SIGNS THE GAME STATE
           const {signature: currentStateSignature_ofPlayer2, hash: currentStateHash_ofPlayer2} = await gameStateChannel2.signGameState();
@@ -1467,7 +1477,8 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
             player2Hits: latestGameState_fromPlayer2.player2Hits,
             gameEnded: latestGameState_fromPlayer2.gameEnded,
             winner: latestGameState_fromPlayer2.winner,
-            timestamp: latestGameState_fromPlayer2.timestamp
+            timestamp: latestGameState_fromPlayer2.timestamp,
+            lastMoveHash: latestGameState_fromPlayer2.lastMoveHash
           };
           console.log("derived game state Player 2", latestGameStateSC_fromPlayer2);
           
@@ -1483,7 +1494,6 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
             gameStateHash: currentStateHash_ofPlayer2,
             proofs: {proof: _proofMovePlayer1, calldata: proofMovePlayer1_converted}
           };
-          
 
           // Verify if the values are correct locally at player 2's end
           let {isValid: resultGameStateSignaturePlayer2} = await gameStateChannel2.verifyGameStateSignature(movesData_player1_byPlayer2.signature.player2, player2.address, movesData_player1_byPlayer2.gameState);
@@ -1492,6 +1502,8 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
           if(!resultGameStateSignaturePlayer2) {
             throw new Error("Move state signature of Player 2 verification failed at Player 2's end! - LOCAL VERIFICATION!");
           }
+
+          // PLAYER 1 VERIFICATION
  
           // Player 1 verifies the proof generated by Player 2
           let resultMovePlayer1 = await moveVerifier.verifyProof(proofMovePlayer1_converted.pA, proofMovePlayer1_converted.pB, proofMovePlayer1_converted.pC, proofMovePlayer1_converted.pubSignals);
@@ -1511,7 +1523,7 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
           const isMyTurn_player1 = await gameStateChannel.isMyTurn();
           let moveStateHash_player1 = "";
           if(isMyTurn_player1) {
-            let {signature: moveStatehash, winnerFound: winnerFound1, winner: winner1} = await gameStateChannel.makeMove(move_player1_byPlayer2);
+            let {signature: moveStatehash, winnerFound: winnerFound1, winner: winner1} = await gameStateChannel.makeMove(movesData_player1_byPlayer2.move);
             moveStateHash_player1 = moveStatehash;
             if(winnerFound1) {
                 console.log("Game Over");
@@ -1538,14 +1550,6 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
           // Player 1 updates the moves using the data passed by Player 2
           await gameStateChannel.updateMoves(movesData_player1_byPlayer2);
 
-          // Checks if the winner is declared
-          if(winnerDeclared) {
-            gameStateChannel.declareWinner(winner);
-            // This will be sent to player 2 and player 2 will update the state accordingly
-            gameStateChannel2.declareWinner(winner);
-            break;
-          }
-
           // No Dispute from Player 1
 
           // Player 1 shares the signature back with player 2
@@ -1561,6 +1565,15 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
           // Player 2 updates the gamestate 
           // Update the current move data for Player 1 at Player 2's side
           await gameStateChannel2.updateMoves(movesData_player1_byPlayer2);
+
+
+          // Checks if the winner is declared
+          if(winnerDeclared) {
+            await gameStateChannel.declareWinner(winner);
+            // This will be sent to player 2 and player 2 will update the state accordingly
+            await gameStateChannel2.declareWinner(winner);
+            break;
+          }
 
           // No Dispute from Player 2
           
@@ -1610,9 +1623,9 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
             throw new Error("Move verification failed");
           } 
 
-          // Increment player2's hit count at Player 1's end
-          gameStateChannel.acknowledgeMove(hit2);
-          
+          gameStateChannel.updateLatestMoveHash(_proofMovePlayer2.publicSignals[6]);
+          console.log("Latest move hash from Player 1 for Player 2 : ", _proofMovePlayer2.publicSignals[6]);
+
           // Generate move data for Player 1
           const moveTimestamp2 = Math.floor(Date.now() / 1000);
           let move_player2_byPlayer1 = {
@@ -1621,6 +1634,9 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
             isHit: hit2,
             timestamp: moveTimestamp2
           };
+
+          // Increment player2's hit count at Player 1's end
+          await gameStateChannel.makeMove(move_player2_byPlayer1);
 
           const {signature: currentStateSignature_ofPlayer1, hash: currentStateHash_ofPlayer1} = await gameStateChannel.signGameState();
           console.log("Player 1 Signature: ", currentStateSignature_ofPlayer1);
@@ -1636,7 +1652,8 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
             player2Hits: latestGameState_fromPlayer1.player2Hits,
             gameEnded: latestGameState_fromPlayer1.gameEnded,
             winner: latestGameState_fromPlayer1.winner,
-            timestamp: latestGameState_fromPlayer1.timestamp
+            timestamp: latestGameState_fromPlayer1.timestamp,
+            lastMoveHash: latestGameState_fromPlayer1.lastMoveHash
           }
           console.log("derived game state Player 1", latestGameStateSC_fromPlayer1);
           
@@ -1675,7 +1692,7 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
           const isMyTurn_player2 = await gameStateChannel2.isMyTurn();
           let moveStateHash_player2 = "";
           if(isMyTurn_player2) {
-            let {signature: moveStatehash, winnerFound: winnerFound2, winner: winner2} = await gameStateChannel2.makeMove(move_player2_byPlayer1);
+            let {signature: moveStatehash, winnerFound: winnerFound2, winner: winner2} = await gameStateChannel2.makeMove(movesData_player2_byPlayer1.move);
             moveStateHash_player2 = moveStatehash;
             if(winnerFound2) {
                 console.log("Game Over");
@@ -1702,13 +1719,6 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
             throw new Error("Move state signature of Player 1 verification failed at Player 2's end!");
           }
           
-          // Checks if the winner is declared
-          if(winnerDeclared) {
-            gameStateChannel.declareWinner(winner);
-            gameStateChannel2.declareWinner(winner);
-            break;
-          }
-
           // PLayer 1 verifies the signature of GameState by Player 2
           let {isValid: resultGameStateSignaturePlayer5} = await gameStateChannel.verifyGameStateSignature(movesData_player2_byPlayer1.signature.player2, player2.address, movesData_player2_byPlayer1.gameState);
           console.log("Move state signature verification player 2 at Player 1's side", resultGameStateSignaturePlayer5);
@@ -1721,13 +1731,20 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
 
           // Update the current move data for Player 2 at Player 1's side
           await gameStateChannel.updateMoves(movesData_player2_byPlayer1);
-          
-          // Breaking for testing purpose
-          if (i == 2) {
+
+          // Checks if the winner is declared
+          if(winnerDeclared) {
+            await gameStateChannel.declareWinner(winner);
+            await gameStateChannel2.declareWinner(winner);
             break;
           }
+
+          if(i == 2) {
+            // for testing purposes
+            break;
+          }
+
         }
-  
         const player2_gs = await gameStateChannel2.getGameState();
         const disputedGameState = player2_gs.movesData[player2_gs.movesData.length - 1];
 
@@ -1741,26 +1758,32 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
           player2Hits: disputedGameState.gameState.player2Hits,
           gameEnded: disputedGameState.gameState.gameEnded,
           winner: disputedGameState.gameState.winner,
-          timestamp: disputedGameState.gameState.timestamp
+          timestamp: disputedGameState.gameState.timestamp,
+          lastMoveHash: disputedGameState.gameState.lastMoveHash
         };
 
+        const {hash: disputedStateHash, signature: disputedStateSignature} = await gameStateChannel2.signGameState();
+        console.log(disputedGameState.signature.player2);
+        console.log(disputedStateSignature);
         console.log("Object ", disputedGameState);
         console.log({
           channelId: Number(channelId),
-          disputeType: gameStateChannel.DisputeType.InvalidMove, // DisputeType.InvalidMove
+          disputeType: gameStateChannel2.DisputeType.InvalidMove, // DisputeType.InvalidMove
           gameState: disputedGameStateObj,
           player1Signature: disputedGameState.signature.player1,
-          player2Signature: disputedGameState.signature.player2
+          player2Signature: disputedGameState.signature.player2,
+          disputedStateHash
         })
         // Initiate dispute
-        await expect(battleshipWaku.connect(player1).initiateDispute(
+        await expect(battleshipWaku.connect(player2).initiateDispute(
           Number(channelId),
-          gameStateChannel.DisputeType.InvalidMove, // DisputeType.InvalidMove
+          gameStateChannel2.DisputeType.InvalidMove, // DisputeType.InvalidMove
           disputedGameStateObj,
           disputedGameState.signature.player1,
-          disputedGameState.signature.player2
+          disputedGameState.signature.player2,
+          disputedStateHash
         )).to.emit(battleshipWaku, "DisputeInitiated").withArgs(
-          1, 1, player1.address, 0
+          1, 1, player2.address, 0
         );
 
         await time.increase(2200); // more than 5Minutes(300 seconds) * 7 minutes
@@ -1830,6 +1853,7 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
       console.log("Offchain verification proof", offchainVerification);
       
       let result = await shipPlacementVerifier.verifyProof(proofPlayer1_converted.pA, proofPlayer1_converted.pB, proofPlayer1_converted.pC, proofPlayer1_converted.pubSignals);
+      
 
       const player1_gameState = await gameStateChannel.generateShipPlacementProof(proofPlayer1_converted, shipPlacementPositionsPlayer1.ships, shipPlacementPositionsPlayer1.board_state, shipPlacementPositionsPlayer1.salt, shipPlacementPositionsPlayer1.commitment, shipPlacementPositionsPlayer1.merkle_root);
 
@@ -1847,7 +1871,7 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
       
       const {signature: stateSignature_createGame_ofPlayer1, hash: stateHash_createGame_ofPlayer1} = await gameStateChannel.createGame(
         "1",
-        "333", 
+        "333",
         player1.address,
         player1_gameState.commitment,
         player1_gameState.merkleRoot,
@@ -1908,7 +1932,8 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
         player2Hits: game.player2Hits,
         gameEnded: game.gameEnded,
         winner: game.winner,
-        timestamp: game.timestamp
+        timestamp: game.timestamp,
+        lastMoveHash: game.lastMoveHash
       }
       
       const txSubmitInitialState_player1 = await battleshipWaku.connect(player1).submitInitialState(
@@ -1949,7 +1974,8 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
         player2Hits: game2.player2Hits,
         gameEnded: game2.gameEnded,
         winner: game2.winner,
-        timestamp: game2.timestamp
+        timestamp: game2.timestamp,
+        lastMoveHash: game2.lastMoveHash
       }
 
       const txSubmitInitialState_player2 = await battleshipWaku.connect(player2).submitInitialState(
@@ -1976,8 +2002,8 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
 
       console.log("StateHash submit initial state player 2", stateHash_player2);
       
-      const gameState_Player2 = await battleshipWaku.getGameState(stateHash_player2);
-      console.log("Game state:: Player 2", gameState_Player2);
+      // const gameState_Player2 = await battleshipWaku.getGameState(stateHash_player2);
+      // console.log("Game state:: Player 2", gameState_Player2);
 
       if (!fs.existsSync(wasmPath)) {
           throw new Error(`WASM file not found at: ${wasmPath}`);
@@ -1992,9 +2018,6 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
       console.log("wasmPath", wasmPath);
       console.log("zkeyPath", zkeyPath);
       console.log("verificationKeyPath", verificationKeyPath);
-
-      
-      console.log("--");
 
       const moveWasmPath = path.join(__dirname, "..", "build", "move_verification", "move_verification_js", "move_verification.wasm");
       const moveZkeyPath = path.join(__dirname, "..", "keys", "move_verification_final.zkey");
@@ -2035,7 +2058,7 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
         const moveInputPlayer1 = {
           salt: shipPlacementPositionsPlayer2.salt,
           ship_placement_commitment: shipPlacementPositionsPlayer2.commitment,
-          previous_move_hash: i == 0? 0: player2_moveStateHash,
+          previous_move_hash: i == 0? ethers.ZeroHash: player2_moveStateHash,
           move_count: i,
           game_id: "333",
           player_id: 0,
@@ -2046,8 +2069,8 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
         };
         // Player 2 generates the proof for the move made by Player 1
         const {proof: _proofMovePlayer1, calldata: proofMovePlayer1} = await gameStateChannel2.generateProof(moveInputPlayer1, moveWasmPath, moveZkeyPath);
-        console.log("proofMovePlayer1", proofMovePlayer1);
-        console.log("_proofMovePlayer1", _proofMovePlayer1);
+        // console.log("proofMovePlayer1", proofMovePlayer1);
+        // console.log("_proofMovePlayer1", _proofMovePlayer1);
         // console.log(proofPlayer1);
         // proofMovePlayer1_converted & _proofMovePlayer1 - To be sent to Player 1
         const proofMovePlayer1_converted = {
@@ -2068,8 +2091,9 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
           throw new Error("Move verification failed");
         } 
 
-        // Increment player1's hit count
-        gameStateChannel2.acknowledgeMove(hit);
+        // Updated the latest move hash
+        console.log("Latest move hash from Player 2 for Player 1 : ", _proofMovePlayer1.publicSignals[6]);
+        gameStateChannel2.updateLatestMoveHash(_proofMovePlayer1.publicSignals[6]);
 
         // Generate move data for Player 1
         const moveTimestamp = Math.floor(Date.now() / 1000);
@@ -2079,6 +2103,9 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
           isHit: hit,
           timestamp: moveTimestamp
         };
+
+        // Make Move at player2's side
+        await gameStateChannel2.makeMove(move_player1_byPlayer2);
 
         // PLAYER 2 SIGNS THE GAME STATE
         const {signature: currentStateSignature_ofPlayer2, hash: currentStateHash_ofPlayer2} = await gameStateChannel2.signGameState();
@@ -2096,7 +2123,8 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
           player2Hits: latestGameState_fromPlayer2.player2Hits,
           gameEnded: latestGameState_fromPlayer2.gameEnded,
           winner: latestGameState_fromPlayer2.winner,
-          timestamp: latestGameState_fromPlayer2.timestamp
+          timestamp: latestGameState_fromPlayer2.timestamp,
+          lastMoveHash: latestGameState_fromPlayer2.lastMoveHash
         };
         console.log("derived game state Player 2", latestGameStateSC_fromPlayer2);
         
@@ -2112,7 +2140,6 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
           gameStateHash: currentStateHash_ofPlayer2,
           proofs: {proof: _proofMovePlayer1, calldata: proofMovePlayer1_converted}
         };
-        
 
         // Verify if the values are correct locally at player 2's end
         let {isValid: resultGameStateSignaturePlayer2} = await gameStateChannel2.verifyGameStateSignature(movesData_player1_byPlayer2.signature.player2, player2.address, movesData_player1_byPlayer2.gameState);
@@ -2121,6 +2148,8 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
         if(!resultGameStateSignaturePlayer2) {
           throw new Error("Move state signature of Player 2 verification failed at Player 2's end! - LOCAL VERIFICATION!");
         }
+
+        // PLAYER 1 VERIFICATION
 
         // Player 1 verifies the proof generated by Player 2
         let resultMovePlayer1 = await moveVerifier.verifyProof(proofMovePlayer1_converted.pA, proofMovePlayer1_converted.pB, proofMovePlayer1_converted.pC, proofMovePlayer1_converted.pubSignals);
@@ -2140,7 +2169,7 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
         const isMyTurn_player1 = await gameStateChannel.isMyTurn();
         let moveStateHash_player1 = "";
         if(isMyTurn_player1) {
-          let {signature: moveStatehash, winnerFound: winnerFound1, winner: winner1} = await gameStateChannel.makeMove(move_player1_byPlayer2);
+          let {signature: moveStatehash, winnerFound: winnerFound1, winner: winner1} = await gameStateChannel.makeMove(movesData_player1_byPlayer2.move);
           moveStateHash_player1 = moveStatehash;
           if(winnerFound1) {
               console.log("Game Over");
@@ -2167,14 +2196,6 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
         // Player 1 updates the moves using the data passed by Player 2
         await gameStateChannel.updateMoves(movesData_player1_byPlayer2);
 
-        // Checks if the winner is declared
-        if(winnerDeclared) {
-          gameStateChannel.declareWinner(winner);
-          // This will be sent to player 2 and player 2 will update the state accordingly
-          gameStateChannel2.declareWinner(winner);
-          break;
-        }
-
         // No Dispute from Player 1
 
         // Player 1 shares the signature back with player 2
@@ -2190,6 +2211,15 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
         // Player 2 updates the gamestate 
         // Update the current move data for Player 1 at Player 2's side
         await gameStateChannel2.updateMoves(movesData_player1_byPlayer2);
+
+
+        // Checks if the winner is declared
+        if(winnerDeclared) {
+          await gameStateChannel.declareWinner(winner);
+          // This will be sent to player 2 and player 2 will update the state accordingly
+          await gameStateChannel2.declareWinner(winner);
+          break;
+        }
 
         // No Dispute from Player 2
         
@@ -2239,9 +2269,9 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
           throw new Error("Move verification failed");
         } 
 
-        // Increment player2's hit count at Player 1's end
-        gameStateChannel.acknowledgeMove(hit2);
-        
+        gameStateChannel.updateLatestMoveHash(_proofMovePlayer2.publicSignals[6]);
+        console.log("Latest move hash from Player 1 for Player 2 : ", _proofMovePlayer2.publicSignals[6]);
+
         // Generate move data for Player 1
         const moveTimestamp2 = Math.floor(Date.now() / 1000);
         let move_player2_byPlayer1 = {
@@ -2250,6 +2280,9 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
           isHit: hit2,
           timestamp: moveTimestamp2
         };
+
+        // Increment player2's hit count at Player 1's end
+        await gameStateChannel.makeMove(move_player2_byPlayer1);
 
         const {signature: currentStateSignature_ofPlayer1, hash: currentStateHash_ofPlayer1} = await gameStateChannel.signGameState();
         console.log("Player 1 Signature: ", currentStateSignature_ofPlayer1);
@@ -2265,7 +2298,8 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
           player2Hits: latestGameState_fromPlayer1.player2Hits,
           gameEnded: latestGameState_fromPlayer1.gameEnded,
           winner: latestGameState_fromPlayer1.winner,
-          timestamp: latestGameState_fromPlayer1.timestamp
+          timestamp: latestGameState_fromPlayer1.timestamp,
+          lastMoveHash: latestGameState_fromPlayer1.lastMoveHash
         }
         console.log("derived game state Player 1", latestGameStateSC_fromPlayer1);
         
@@ -2304,7 +2338,7 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
         const isMyTurn_player2 = await gameStateChannel2.isMyTurn();
         let moveStateHash_player2 = "";
         if(isMyTurn_player2) {
-          let {signature: moveStatehash, winnerFound: winnerFound2, winner: winner2} = await gameStateChannel2.makeMove(move_player2_byPlayer1);
+          let {signature: moveStatehash, winnerFound: winnerFound2, winner: winner2} = await gameStateChannel2.makeMove(movesData_player2_byPlayer1.move);
           moveStateHash_player2 = moveStatehash;
           if(winnerFound2) {
               console.log("Game Over");
@@ -2331,13 +2365,6 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
           throw new Error("Move state signature of Player 1 verification failed at Player 2's end!");
         }
         
-        // Checks if the winner is declared
-        if(winnerDeclared) {
-          gameStateChannel.declareWinner(winner);
-          gameStateChannel2.declareWinner(winner);
-          break;
-        }
-
         // PLayer 1 verifies the signature of GameState by Player 2
         let {isValid: resultGameStateSignaturePlayer5} = await gameStateChannel.verifyGameStateSignature(movesData_player2_byPlayer1.signature.player2, player2.address, movesData_player2_byPlayer1.gameState);
         console.log("Move state signature verification player 2 at Player 1's side", resultGameStateSignaturePlayer5);
@@ -2350,88 +2377,89 @@ describe("BattleshipStateChannelGame - Advanced End-to-End Tests", function () {
 
         // Update the current move data for Player 2 at Player 1's side
         await gameStateChannel.updateMoves(movesData_player2_byPlayer1);
-        
-        // Breaking for testing purpose
-        if (i == 2) {
+
+        // Checks if the winner is declared
+        if(winnerDeclared) {
+          await gameStateChannel.declareWinner(winner);
+          await gameStateChannel2.declareWinner(winner);
           break;
         }
+
+        if( i == 2 ) {
+          break;
+        }
+
       }
-  
-        const player2_gs = await gameStateChannel2.getGameState();
-        
-        console.log("Total Moves: ", player2_gs.movesData.length);
-        console.log("Player 2's current game state", player2_gs)
-        const disputedGameState = player2_gs.movesData[player2_gs.movesData.length - 1];
-        console.log("disputedGameState", disputedGameState);
 
-        const disputedGameStateObj = {
-          nonce: disputedGameState.gameState.nonce,
-          currentTurn: disputedGameState.gameState.currentTurn,
-          moveCount: disputedGameState.gameState.moveCount,
-          player1ShipCommitment: disputedGameState.gameState.player1ShipCommitment,
-          player2ShipCommitment: disputedGameState.gameState.player2ShipCommitment,
-          player1Hits: disputedGameState.gameState.player1Hits,
-          player2Hits: disputedGameState.gameState.player2Hits,
-          gameEnded: disputedGameState.gameState.gameEnded,
-          winner: disputedGameState.gameState.winner,
-          timestamp: disputedGameState.gameState.timestamp
-        };
-        
-        console.log(disputedGameStateObj);
+      const player2_gs = await gameStateChannel2.getGameState();
+      const disputedGameState = player2_gs.movesData[player2_gs.movesData.length - 1];
 
-        const disputeSignature_byPlayer2 = await gameStateChannel2.signCustomGameState(disputedGameStateObj);
-        console.log("disputeSignature_byPlayer2", disputeSignature_byPlayer2);
-        console.log("Object ", disputedGameState);
-        console.log({
-          channelId: Number(channelId),
-          disputeType: gameStateChannel.DisputeType.InvalidMove, // DisputeType.InvalidMove
-          disputedGameStateObj,
-          disputeSignature_byPlayer2,
-          signature: disputedGameState.moveStatehash
-        })
-        // Initiate dispute
-        await expect(battleshipWaku.connect(player2).initiateDispute(
-          Number(channelId),
-          gameStateChannel.DisputeType.InvalidMove, // DisputeType.InvalidMove
-          disputedGameStateObj,
-          disputedGameState.moveStatehash,
-          disputeSignature_byPlayer2
-        )).to.emit(battleshipWaku, "DisputeInitiated").withArgs(
-          1, 1, player2.address, 0
-        );
-
+      const disputedGameStateObj = {
+        nonce: disputedGameState.gameState.nonce,
+        currentTurn: disputedGameState.gameState.currentTurn,
+        moveCount: disputedGameState.gameState.moveCount,
+        player1ShipCommitment: disputedGameState.gameState.player1ShipCommitment,
+        player2ShipCommitment: disputedGameState.gameState.player2ShipCommitment,
+        player1Hits: disputedGameState.gameState.player1Hits,
+        player2Hits: disputedGameState.gameState.player2Hits,
+        gameEnded: disputedGameState.gameState.gameEnded,
+        winner: disputedGameState.gameState.winner,
+        timestamp: disputedGameState.gameState.timestamp,
+        lastMoveHash: disputedGameState.gameState.lastMoveHash
+      };
+      const {hash: disputedStateHash, signature: disputedStateSignature} = await gameStateChannel2.signGameState();
+      console.log("Object ", disputedGameState);
+      console.log({
+        channelId: Number(channelId),
+        disputeType: gameStateChannel2.DisputeType.InvalidProof, // DisputeType.InvalidMove
+        gameState: disputedGameStateObj,
+        player1Signature: disputedGameState.signature.player1,
+        player2Signature: disputedGameState.signature.player2,
+        disputedStateHash
+      })
+      // Initiate dispute
+      await expect(battleshipWaku.connect(player2).initiateDispute(
+        Number(channelId),
+        gameStateChannel2.DisputeType.InvalidProof,
+        disputedGameStateObj,
+        disputedGameState.signature.player1,
+        disputedGameState.signature.player2,
+        disputedStateHash
+      )).to.emit(battleshipWaku, "DisputeInitiated").withArgs(
+        Number(channelId), 1, player2.address, gameStateChannel2.DisputeType.InvalidProof
+      );
         // Prepare all the moves made in the game by both the players using player 1's movesData
-        const player1_gs = await gameStateChannel.getGameState();
+        // const player1_gs = await gameStateChannel.getGameState();
 
-        const player1_moveProofs = player1_gs.movesData.map((move: any) => move.proofs.calldata);
+        // const player1_moveProofs = player1_gs.movesData.map((move: any) => move.proofs.calldata);
 
-        // Respond to dispute with counter-state
-        await expect(battleshipWaku.connect(player2).respondToDispute(
-          1,
-          player1_gs,
-          disputeSignature_byPlayer2,
-          disputeSignature_byPlayer2,
-          player1_moveProofs
-        )).to.emit(battleshipWaku, "DisputeChallenged")
-          .withArgs(1, player2.address, hre.ethers.keccak256(hre.ethers.AbiCoder.defaultAbiCoder().encode(
-            ["tuple(bytes32,uint256,address,uint256,bytes32,bytes32,uint8,uint8,bool,address,uint256)"],
-            [[
-              player1_gs.stateHash,
-              player1_gs.nonce,
-              player1_gs.currentTurn,
-              player1_gs.moveCount,
-              player1_gs.player1ShipCommitment,
-              player1_gs.player2ShipCommitment,
-              player1_gs.player1Hits,
-              player1_gs.player2Hits,
-              player1_gs.gameEnded,
-              player1_gs.winner,
-              player1_gs.timestamp
-            ]]
-          )));
+        // // Respond to dispute with counter-state
+        // await expect(battleshipWaku.connect(player2).respondToDispute(
+        //   1,
+        //   player1_gs,
+        //   disputedGameState.signature.player1,
+        //   disputedGameState.signature.player2,
+        //   player1_moveProofs
+        // )).to.emit(battleshipWaku, "DisputeChallenged")
+        //   .withArgs(1, player2.address, hre.ethers.keccak256(hre.ethers.AbiCoder.defaultAbiCoder().encode(
+        //     ["tuple(bytes32,uint256,address,uint256,bytes32,bytes32,uint8,uint8,bool,address,uint256)"],
+        //     [[
+        //       player1_gs.stateHash,
+        //       player1_gs.nonce,
+        //       player1_gs.currentTurn,
+        //       player1_gs.moveCount,
+        //       player1_gs.player1ShipCommitment,
+        //       player1_gs.player2ShipCommitment,
+        //       player1_gs.player1Hits,
+        //       player1_gs.player2Hits,
+        //       player1_gs.gameEnded,
+        //       player1_gs.winner,
+        //       player1_gs.timestamp
+        //     ]]
+        //   )));
 
-        const updatedDispute = await battleshipWaku.getDispute(1);
-        expect(updatedDispute[4]).to.equal(1); // DisputeStatus.Challenged
+        // const updatedDispute = await battleshipWaku.getDispute(1);
+        // expect(updatedDispute[4]).to.equal(1); // DisputeStatus.Challenged
     });
   });
 

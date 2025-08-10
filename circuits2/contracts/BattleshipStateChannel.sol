@@ -33,7 +33,7 @@ contract BattleshipStateChannel is Initializable, OwnableUpgradeable, UUPSUpgrad
     // This is keccak256("GameState(uint256 nonce,address currentTurn,uint256 moveCount,bytes32 player1ShipCommitment,bytes32 player2ShipCommitment,uint8 player1Hits,uint8 player2Hits,bool gameEnded,address winner,uint256 timestamp)")
     // Make sure there are no spaces and types are canonical (e.g., uint256, not uint).
     bytes32 public constant GAMESTATE_TYPEHASH = keccak256(
-        "GameState(uint256 nonce,address currentTurn,uint256 moveCount,bytes32 player1ShipCommitment,bytes32 player2ShipCommitment,uint8 player1Hits,uint8 player2Hits,bool gameEnded,address winner,uint256 timestamp,bytes32 lastMoveHash)"
+        "GameState(uint256 nonce,address currentTurn,uint256 moveCount,bytes32 player1ShipCommitment,bytes32 player2ShipCommitment,uint8 player1Hits,uint8 player2Hits,bool gameEnded,address winner,uint256 timestamp,uint256 lastMoveHash)"
     );
 
     // The domain separator, unique to this contract instance.
@@ -105,7 +105,7 @@ contract BattleshipStateChannel is Initializable, OwnableUpgradeable, UUPSUpgrad
         bool gameEnded;
         address winner;
         uint256 timestamp;
-        bytes32 lastMoveHash;
+        uint256 lastMoveHash;
     }
 
     struct Dispute {
@@ -212,9 +212,9 @@ contract BattleshipStateChannel is Initializable, OwnableUpgradeable, UUPSUpgrad
 
         // Move Hash Verfication
         if (expectedState.moveCount > 0) {
-            require(bytes32(moveProof.pubSignals[1]) == expectedState.lastMoveHash, "Move hash mismatch");
+            require(moveProof.pubSignals[1] == expectedState.lastMoveHash, "Move hash mismatch");
         } else {
-            require(bytes32(moveProof.pubSignals[1]) == 0, "First move should have zero as previous hash");
+            require(moveProof.pubSignals[1] == 0, "First move should have zero as previous hash");
         }
         return true;
     }
@@ -231,7 +231,7 @@ contract BattleshipStateChannel is Initializable, OwnableUpgradeable, UUPSUpgrad
         require(toState.moveCount == fromState.moveCount + 1, "Invalid move count progression");
 
         // Verify move hash update
-        require(toState.lastMoveHash == bytes32(moveProof.pubSignals[6]), "Move hash not updated correctly");
+        require(toState.lastMoveHash == moveProof.pubSignals[6], "Move hash not updated correctly");
 
         // Verify hit count progression
         uint256 hit = moveProof.pubSignals[3];
@@ -397,7 +397,7 @@ contract BattleshipStateChannel is Initializable, OwnableUpgradeable, UUPSUpgrad
         bytes32 stateHash = _computeStateHash(challengedState);
 
         if(disputeType == DisputeType.InvalidMove || disputeType == DisputeType.InvalidProof) {
-            _handleMoveDisputeInitiation(channelId, challengedState, signature1, signature2, channel, respondent, stateHash, disputedMoveHash);
+            _handleMoveDisputeInitiation(channelId, disputeType, challengedState, signature1, signature2, channel, respondent, stateHash, disputedMoveHash);
         } else if(disputeType == DisputeType.MaliciousDispute) {
             _handleMaliciousDisputeInitiation(channelId, challengedState, signature1, signature2, channel, respondent, stateHash, disputedMoveHash);
         } else {
@@ -432,6 +432,7 @@ contract BattleshipStateChannel is Initializable, OwnableUpgradeable, UUPSUpgrad
 
    function _handleMoveDisputeInitiation(
         uint256 channelId,
+        DisputeType disputeType,
         GameState memory challengedState,
         bytes calldata signature1,
         bytes calldata signature2,
@@ -447,7 +448,7 @@ contract BattleshipStateChannel is Initializable, OwnableUpgradeable, UUPSUpgrad
             require(_verifySignature(stateHash, signature2, channel.player2), "Invalid challenger signature");
         }
         
-        _createDispute(channelId, DisputeType.InvalidMove, challengedState, stateHash, respondent, disputedMoveHash);
+        _createDispute(channelId, disputeType, challengedState, stateHash, respondent, disputedMoveHash);
     }
 
     // Helper function to create dispute - reduces stack depth
