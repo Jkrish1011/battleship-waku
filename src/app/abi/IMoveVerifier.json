@@ -1,7 +1,7 @@
 {
   "_format": "hh-sol-artifact-1",
   "contractName": "IMoveVerifier",
-  "sourceName": "contracts/BattleshipWaku.sol",
+  "sourceName": "contracts/BattleshipStateChannel.sol",
   "abi": [
     {
       "inputs": [
@@ -21,9 +21,9 @@
           "type": "uint256[2]"
         },
         {
-          "internalType": "uint256[3]",
+          "internalType": "uint256[7]",
           "name": "_pubSignals",
-          "type": "uint256[3]"
+          "type": "uint256[7]"
         }
       ],
       "name": "verifyProof",

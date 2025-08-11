@@ -1,0 +1,506 @@
+{
+  "manifestVersion": "3.2",
+  "proxies": [
+    {
+      "address": "0x7f6c6E02511a4b29bB83ac3163844a75d4EbB07e",
+      "txHash": "0x9b60d70ade6f73b0c8ed99d9674cc620d6a6934cb1d1054f67ef8b43a5c1e0d5",
+      "kind": "uups"
+    }
+  ],
+  "impls": {
+    "517b59e1403861e330f9a3d11996f6878f6969510fa53353a53f6b9eedc50c22": {
+      "address": "0x3cF205e48938b11f8997Ad10aaF487544DFB92d6",
+      "txHash": "0x1eeed768e119b59d55557a6dc289ecee68c5b25fc122fa688ff1194f27d81240",
+      "layout": {
+        "solcVersion": "0.8.22",
+        "storage": [
+          {
+            "label": "shipPlacementVerifier",
+            "offset": 0,
+            "slot": "0",
+            "type": "t_contract(IShipPlacementVerifier)1593",
+            "contract": "BattleshipStateChannel",
+            "src": "contracts/BattleshipStateChannel.sol:28"
+          },
+          {
+            "label": "moveVerifier",
+            "offset": 0,
+            "slot": "1",
+            "type": "t_contract(IMoveVerifier)1617",
+            "contract": "BattleshipStateChannel",
+            "src": "contracts/BattleshipStateChannel.sol:29"
+          },
+          {
+            "label": "winVerifier",
+            "offset": 0,
+            "slot": "2",
+            "type": "t_contract(IWinVerifier)1641",
+            "contract": "BattleshipStateChannel",
+            "src": "contracts/BattleshipStateChannel.sol:30"
+          },
+          {
+            "label": "DOMAIN_SEPARATOR",
+            "offset": 0,
+            "slot": "3",
+            "type": "t_bytes32",
+            "contract": "BattleshipStateChannel",
+            "src": "contracts/BattleshipStateChannel.sol:40"
+          },
+          {
+            "label": "channels",
+            "offset": 0,
+            "slot": "4",
+            "type": "t_mapping(t_uint256,t_struct(Channel)1776_storage)",
+            "contract": "BattleshipStateChannel",
+            "src": "contracts/BattleshipStateChannel.sol:135"
+          },
+          {
+            "label": "disputes",
+            "offset": 0,
+            "slot": "5",
+            "type": "t_mapping(t_uint256,t_struct(Dispute)1827_storage)",
+            "contract": "BattleshipStateChannel",
+            "src": "contracts/BattleshipStateChannel.sol:136"
+          },
+          {
+            "label": "channelToDispute",
+            "offset": 0,
+            "slot": "6",
+            "type": "t_mapping(t_uint256,t_uint256)",
+            "contract": "BattleshipStateChannel",
+            "src": "contracts/BattleshipStateChannel.sol:137"
+          },
+          {
+            "label": "gameStates",
+            "offset": 0,
+            "slot": "7",
+            "type": "t_mapping(t_bytes32,t_struct(GameState)1799_storage)",
+            "contract": "BattleshipStateChannel",
+            "src": "contracts/BattleshipStateChannel.sol:138"
+          },
+          {
+            "label": "verifiedMoveHashes",
+            "offset": 0,
+            "slot": "8",
+            "type": "t_mapping(t_uint256,t_mapping(t_bytes32,t_bool))",
+            "contract": "BattleshipStateChannel",
+            "src": "contracts/BattleshipStateChannel.sol:139"
+          },
+          {
+            "label": "nextChannelId",
+            "offset": 0,
+            "slot": "9",
+            "type": "t_uint256",
+            "contract": "BattleshipStateChannel",
+            "src": "contracts/BattleshipStateChannel.sol:141"
+          },
+          {
+            "label": "nextDisputeId",
+            "offset": 0,
+            "slot": "10",
+            "type": "t_uint256",
+            "contract": "BattleshipStateChannel",
+            "src": "contracts/BattleshipStateChannel.sol:142"
+          }
+        ],
+        "types": {
+          "t_address": {
+            "label": "address",
+            "numberOfBytes": "20"
+          },
+          "t_bool": {
+            "label": "bool",
+            "numberOfBytes": "1"
+          },
+          "t_struct(InitializableStorage)73_storage": {
+            "label": "struct Initializable.InitializableStorage",
+            "members": [
+              {
+                "label": "_initialized",
+                "type": "t_uint64",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "_initializing",
+                "type": "t_bool",
+                "offset": 8,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_struct(OwnableStorage)13_storage": {
+            "label": "struct OwnableUpgradeable.OwnableStorage",
+            "members": [
+              {
+                "label": "_owner",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_struct(ReentrancyGuardStorage)226_storage": {
+            "label": "struct ReentrancyGuardUpgradeable.ReentrancyGuardStorage",
+            "members": [
+              {
+                "label": "_status",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_uint256": {
+            "label": "uint256",
+            "numberOfBytes": "32"
+          },
+          "t_uint64": {
+            "label": "uint64",
+            "numberOfBytes": "8"
+          },
+          "t_bytes32": {
+            "label": "bytes32",
+            "numberOfBytes": "32"
+          },
+          "t_contract(IMoveVerifier)1617": {
+            "label": "contract IMoveVerifier",
+            "numberOfBytes": "20"
+          },
+          "t_contract(IShipPlacementVerifier)1593": {
+            "label": "contract IShipPlacementVerifier",
+            "numberOfBytes": "20"
+          },
+          "t_contract(IWinVerifier)1641": {
+            "label": "contract IWinVerifier",
+            "numberOfBytes": "20"
+          },
+          "t_enum(ChannelStatus)1682": {
+            "label": "enum BattleshipStateChannel.ChannelStatus",
+            "members": [
+              "Open",
+              "Disputed",
+              "Settled",
+              "Closed"
+            ],
+            "numberOfBytes": "1"
+          },
+          "t_enum(DisputeStatus)1695": {
+            "label": "enum BattleshipStateChannel.DisputeStatus",
+            "members": [
+              "Active",
+              "Challenged",
+              "Resolved"
+            ],
+            "numberOfBytes": "1"
+          },
+          "t_enum(DisputeType)1691": {
+            "label": "enum BattleshipStateChannel.DisputeType",
+            "members": [
+              "InvalidMove",
+              "InvalidShipPlacement",
+              "InvalidHitResult",
+              "ReusedMove",
+              "InvalidProof",
+              "MaliciousDispute",
+              "InvalidStateChain",
+              "GameContextMismatch"
+            ],
+            "numberOfBytes": "1"
+          },
+          "t_mapping(t_address,t_bool)": {
+            "label": "mapping(address => bool)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_bytes32,t_bool)": {
+            "label": "mapping(bytes32 => bool)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_bytes32,t_struct(GameState)1799_storage)": {
+            "label": "mapping(bytes32 => struct BattleshipStateChannel.GameState)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_mapping(t_bytes32,t_bool))": {
+            "label": "mapping(uint256 => mapping(bytes32 => bool))",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_struct(Channel)1776_storage)": {
+            "label": "mapping(uint256 => struct BattleshipStateChannel.Channel)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_struct(Dispute)1827_storage)": {
+            "label": "mapping(uint256 => struct BattleshipStateChannel.Dispute)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_uint256)": {
+            "label": "mapping(uint256 => uint256)",
+            "numberOfBytes": "32"
+          },
+          "t_struct(Channel)1776_storage": {
+            "label": "struct BattleshipStateChannel.Channel",
+            "members": [
+              {
+                "label": "channelId",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "player1",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "player2",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "status",
+                "type": "t_enum(ChannelStatus)1682",
+                "offset": 20,
+                "slot": "2"
+              },
+              {
+                "label": "openedAt",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "3"
+              },
+              {
+                "label": "latestStateHash",
+                "type": "t_bytes32",
+                "offset": 0,
+                "slot": "4"
+              },
+              {
+                "label": "latestNonce",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "5"
+              },
+              {
+                "label": "winner",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "6"
+              },
+              {
+                "label": "settlementTime",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "7"
+              },
+              {
+                "label": "hasSubmittedInitialState",
+                "type": "t_mapping(t_address,t_bool)",
+                "offset": 0,
+                "slot": "8"
+              }
+            ],
+            "numberOfBytes": "288"
+          },
+          "t_struct(Dispute)1827_storage": {
+            "label": "struct BattleshipStateChannel.Dispute",
+            "members": [
+              {
+                "label": "channelId",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "challenger",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "respondent",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "disputeType",
+                "type": "t_enum(DisputeType)1691",
+                "offset": 20,
+                "slot": "2"
+              },
+              {
+                "label": "status",
+                "type": "t_enum(DisputeStatus)1695",
+                "offset": 21,
+                "slot": "2"
+              },
+              {
+                "label": "challengeTime",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "3"
+              },
+              {
+                "label": "responseDeadline",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "4"
+              },
+              {
+                "label": "challengedStateHash",
+                "type": "t_bytes32",
+                "offset": 0,
+                "slot": "5"
+              },
+              {
+                "label": "challengedNonce",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "6"
+              },
+              {
+                "label": "challengedState",
+                "type": "t_struct(GameState)1799_storage",
+                "offset": 0,
+                "slot": "7"
+              },
+              {
+                "label": "resolved",
+                "type": "t_bool",
+                "offset": 0,
+                "slot": "15"
+              },
+              {
+                "label": "disputedMoveHash",
+                "type": "t_bytes32",
+                "offset": 0,
+                "slot": "16"
+              }
+            ],
+            "numberOfBytes": "544"
+          },
+          "t_struct(GameState)1799_storage": {
+            "label": "struct BattleshipStateChannel.GameState",
+            "members": [
+              {
+                "label": "nonce",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "currentTurn",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "moveCount",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "player1ShipCommitment",
+                "type": "t_bytes32",
+                "offset": 0,
+                "slot": "3"
+              },
+              {
+                "label": "player2ShipCommitment",
+                "type": "t_bytes32",
+                "offset": 0,
+                "slot": "4"
+              },
+              {
+                "label": "player1Hits",
+                "type": "t_uint8",
+                "offset": 0,
+                "slot": "5"
+              },
+              {
+                "label": "player2Hits",
+                "type": "t_uint8",
+                "offset": 1,
+                "slot": "5"
+              },
+              {
+                "label": "gameEnded",
+                "type": "t_bool",
+                "offset": 2,
+                "slot": "5"
+              },
+              {
+                "label": "winner",
+                "type": "t_address",
+                "offset": 3,
+                "slot": "5"
+              },
+              {
+                "label": "timestamp",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "6"
+              },
+              {
+                "label": "lastMoveHash",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "7"
+              }
+            ],
+            "numberOfBytes": "256"
+          },
+          "t_uint8": {
+            "label": "uint8",
+            "numberOfBytes": "1"
+          }
+        },
+        "namespaces": {
+          "erc7201:openzeppelin.storage.ReentrancyGuard": [
+            {
+              "contract": "ReentrancyGuardUpgradeable",
+              "label": "_status",
+              "type": "t_uint256",
+              "src": "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol:43",
+              "offset": 0,
+              "slot": "0"
+            }
+          ],
+          "erc7201:openzeppelin.storage.Ownable": [
+            {
+              "contract": "OwnableUpgradeable",
+              "label": "_owner",
+              "type": "t_address",
+              "src": "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol:24",
+              "offset": 0,
+              "slot": "0"
+            }
+          ],
+          "erc7201:openzeppelin.storage.Initializable": [
+            {
+              "contract": "Initializable",
+              "label": "_initialized",
+              "type": "t_uint64",
+              "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:69",
+              "offset": 0,
+              "slot": "0"
+            },
+            {
+              "contract": "Initializable",
+              "label": "_initializing",
+              "type": "t_bool",
+              "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:73",
+              "offset": 8,
+              "slot": "0"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

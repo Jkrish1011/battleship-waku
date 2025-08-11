@@ -7,7 +7,7 @@ import { BOARD_SIZE, createBoard, Ship, SHIPS, ChatMessage, MoveReplyMessage, Bo
 // import { BattleshipGameGenerator } from "./helpers/GameGenerator";
 import { GameStateChannel } from "./helpers/GameStateChannel";
 import { getContract } from "../utils/gameUtils";
-import battleshipWakuAbi from "./../abi/BattleshipWaku.json" assert { type: "json" };
+import battleshipStateChannelAbi from "./../abi/BattleshipStateChannel.json" assert { type: "json" };
 import { useWallet } from "../store/useWallet";
 import Image from "next/image";
 import { toast } from "react-toastify";
@@ -391,7 +391,7 @@ function PlayerBoard(props: {
       setTxDetails(null);
       setTxError(null);
       try{
-        const battleshipWaku = await getContract(process.env.NEXT_PUBLIC_BATTLESHIP_CONTRACT_ADDRESS as string, battleshipWakuAbi.abi);
+        const battleshipWaku = await getContract(process.env.NEXT_PUBLIC_BATTLESHIP_CONTRACT_ADDRESS as string, battleshipStateChannelAbi.abi);
         const userAddress = address;
         if(games.length > 0) {
           for(let i=0; i < games.length; i++) {

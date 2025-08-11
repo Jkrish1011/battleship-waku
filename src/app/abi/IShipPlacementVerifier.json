@@ -1,7 +1,7 @@
 {
   "_format": "hh-sol-artifact-1",
   "contractName": "IShipPlacementVerifier",
-  "sourceName": "contracts/BattleshipWaku.sol",
+  "sourceName": "contracts/BattleshipStateChannel.sol",
   "abi": [
     {
       "inputs": [

@@ -49,8 +49,12 @@ if (require.main === module) {
 
         const moveJson = {
             salt: salt.toString(),
-            commitment: commitment,
+            ship_placement_commitment: commitment,
             merkle_root: merkleRoot,
+            previous_move_hash: 0,
+            move_count: 0,
+            game_id: 1,
+            player_id: 0,
             board_state: boardState,
             hit: hit,
             guess_x: guess[0],

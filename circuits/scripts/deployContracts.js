@@ -23,12 +23,12 @@ async function main() {
             console.log(`${artifact} deployed to:`, address);
         }
 
-        console.log("Deploying BattleshipWaku...");
-        const BattleshipWaku = await ethers.getContractFactory("BattleshipWaku");
-        const battleship = await upgrades.deployProxy(BattleshipWaku, verifierAddresses);
+        console.log("Deploying BattleshipStateChannel...");
+        const BattleshipStateChannel = await ethers.getContractFactory("BattleshipStateChannel");
+        const battleship = await upgrades.deployProxy(BattleshipStateChannel, verifierAddresses);
         await battleship.waitForDeployment();
         
-        console.log("BattleshipWaku deployed to:", await battleship.getAddress());
+        console.log("BattleshipStateChannel deployed to:", await battleship.getAddress());
 
         // Verify the proxy deployment
         console.log("\n3. Verifying proxy deployment...");
@@ -59,18 +59,21 @@ async function main() {
     }
 }
 /*
+Compiled 5 Solidity files successfully (evm target: paris).
+[dotenv@17.0.0] injecting env (7) from .env – 🔐 encrypt with dotenvx: https://dotenvx.com
+[dotenv@17.0.0] injecting env (7) from .env – 🔐 encrypt with dotenvx: https://dotenvx.com
 Deploying contracts with the account: 0x2B27326d412efB3D03B142f4DEA2Dd3E53Dd7bB2
-Account balance: 239190769535213379
+Account balance: 1051479890404784301
 
 1. Deploying verifier contracts...
-ShipPlacementVerifier deployed to: 0x2E338F1F4e012D65b20cD8A6EF2cd443EAA6303B
-MoveVerifier deployed to: 0x686aFb63d1760A984675Df0B285bc6b0DEDC8F9A
-WinVerifier deployed to: 0xb0dCfe981BADfc1eEaC7b0Bcb51556c4c02E9D88
-Deploying BattleshipWaku...
-BattleshipWaku deployed to: 0xA4605f06ccbBf8Fe1204BCFf36DE5212Cb0855a1
+ShipPlacementVerifier deployed to: 0xA325bE8A890d014Ab2b40C983521feA5CF11d1A8
+MoveVerifier deployed to: 0xA6c8FE667a67C766D4D8e50DEC753FEe21172c10
+WinVerifier deployed to: 0xce3613a901a03132B530e1f937d9Fe9A2035B399
+Deploying BattleshipStateChannel...
+BattleshipStateChannel deployed to: 0x7f6c6E02511a4b29bB83ac3163844a75d4EbB07e
 
 3. Verifying proxy deployment...
-Implementation deployed to: 0x53E8360305537c3A73E27645778B588CE1e80377
+Implementation deployed to: 0x3cF205e48938b11f8997Ad10aaF487544DFB92d6
 Admin address: 0x0000000000000000000000000000000000000000
 Contract owner: 0x2B27326d412efB3D03B142f4DEA2Dd3E53Dd7bB2
 
