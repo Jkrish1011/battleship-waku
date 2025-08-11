@@ -1,6 +1,6 @@
-# Sample Hardhat Project
+# Battleship Waku project State Channel Contracts
 
-This project demonstrates a basic Hardhat use case. It comes with a sample contract, a test for that contract, and a Hardhat Ignition module that deploys that contract.
+This project demonstrates a how state channels can be implemented for a Battleship game which uses zero knowledge proofs to verify the game state, each move and the final win state.
 
 Try running some of the following tasks:
 

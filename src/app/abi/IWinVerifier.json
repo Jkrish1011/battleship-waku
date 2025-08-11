@@ -1,7 +1,7 @@
 {
   "_format": "hh-sol-artifact-1",
   "contractName": "IWinVerifier",
-  "sourceName": "contracts/BattleshipWaku.sol",
+  "sourceName": "contracts/BattleshipStateChannel.sol",
   "abi": [
     {
       "inputs": [
