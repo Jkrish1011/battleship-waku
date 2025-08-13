@@ -95,7 +95,7 @@ function PlayerBoard(props: {
         if (signer) {
           console.log("gameId", gameId);
           console.log("roomId", roomId);
-          const channel = new GameStateChannel(roomId, signer);
+          const channel = new GameStateChannel(roomId, signer, Number(process.env.NEXT_PUBLIC_CHAIN_ID), process.env.NEXT_PUBLIC_BATTLESHIP_CONTRACT_ADDRESS as string, joinedOrCreated == "created" ? "initiator" : "challenger");
           setGameStateChannel(channel);
           // Initialize gameStateData
           setGameStateData(channel.getGameState());

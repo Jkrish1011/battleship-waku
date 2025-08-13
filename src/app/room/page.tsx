@@ -4,7 +4,7 @@
 import { useRouter } from "next/navigation";
 import React, { useEffect, useState } from "react";
 import { useWallet } from "../store/useWallet";
-import battleshipWakuAbi from "./../abi/BattleshipWaku.json" assert { type: "json" };
+import battleshipWakuAbi from "./../abi/BattleshipStateChannel.json" assert { type: "json" };
 import { getContract, shorten } from "../utils/gameUtils";
 import Navbar from "../components/NavBar";
 
@@ -36,34 +36,42 @@ const Page = () => {
     useEffect(() => {
       (async () => {
         const contract = await getContract(process.env.NEXT_PUBLIC_BATTLESHIP_CONTRACT_ADDRESS as string, battleshipWakuAbi.abi);
-        const gamesContract = await contract.getAllGames({
-          gasLimit: 500000
-        });
-        let parsedGames: any[] = [];
-        // If games is an array of arrays (each game is an array of values)
-        if (Array.isArray(gamesContract) && gamesContract.length > 0) {
-          parsedGames = gamesContract.map((game, index) => {
-              if (Array.isArray(game)) {
-                  return {
-                      gameId: game[0].toString(),
-                      player1: game[1].toString(),
-                      player2: game[2].toString(),
-                      isActive: game[3].toString(),
-                      playerTurn: game[4].toString(),
-                      player1_board_commitment: game[5].toString(),
-                      player1_merkle_root: game[6].toString(),
-                      player2_board_commitment: game[7].toString(),
-                      player2_merkle_root: game[8].toString(),
-                      wakuRoomId: game[11].toString(),
-                      // Add the rest of the fields based on your GameView struct
-                  };
-              }
-              return game;
-          });
+        // const gamesContract = await contract.getAllGames({
+        //   gasLimit: 500000
+        // });
+        // let parsedGames: any[] = [];
+        // // If games is an array of arrays (each game is an array of values)
+        // if (Array.isArray(gamesContract) && gamesContract.length > 0) {
+        //   parsedGames = gamesContract.map((game, index) => {
+        //       if (Array.isArray(game)) {
+        //           return {
+        //               gameId: game[0].toString(),
+        //               player1: game[1].toString(),
+        //               player2: game[2].toString(),
+        //               isActive: game[3].toString(),
+        //               playerTurn: game[4].toString(),
+        //               player1_board_commitment: game[5].toString(),
+        //               player1_merkle_root: game[6].toString(),
+        //               player2_board_commitment: game[7].toString(),
+        //               player2_merkle_root: game[8].toString(),
+        //               wakuRoomId: game[11].toString(),
+        //               // Add the rest of the fields based on your GameView struct
+        //           };
+        //       }
+        //       return game;
+        //   });
+        // }
+        // console.log({parsedGames});
+        // localStorage.setItem('games', JSON.stringify(parsedGames));
+        // setGames(parsedGames);
+        const games = localStorage.getItem('games');
+        if(!games) {
+          console.log("No games found!");
+          return;
         }
-        console.log({parsedGames});
-        localStorage.setItem('games', JSON.stringify(parsedGames));
+        const parsedGames = JSON.parse(games);
         setGames(parsedGames);
+        console.log({parsedGames});
       })();
       
     }, []);
