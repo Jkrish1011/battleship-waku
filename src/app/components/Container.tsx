@@ -46,7 +46,7 @@ const Container = (props: {
             return;
         }
         const decoder = createWakuDecoder(contentTopic);
-        await wakuNode?.nextFilter.subscribe(decoder, (wakuMessage: DecodedMessage) => { 
+        await wakuNode?.filter.subscribe(decoder, (wakuMessage: DecodedMessage) => { 
             console.log("Raw Waku message received, payload length:", wakuMessage.payload.length);
             const decodedMessage = decodeMessage(wakuMessage);
             

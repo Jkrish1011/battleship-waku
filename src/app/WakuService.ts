@@ -33,29 +33,13 @@ export async function getWakuNode(): Promise<LightNode> {
     const privateKey = await generateKeyPairFromSeed("Ed25519", fromString(seed));
 
     const node = await createLightNode({
-        defaultBootstrap: false,
-        networkConfig: {
-            clusterId: 42,
-            shards: [0]
-        },
-        discovery: {
-            dns: false,
-            peerExchange: true,
-            localPeerCache: false,
-        },
-        numPeersToUse: 2,
+        defaultBootstrap: true,
         libp2p: {
             privateKey,
         },
     });
 
-    await Promise.allSettled([
-        node.dial("/dns4/waku-test.bloxy.one/tcp/8095/wss/p2p/16Uiu2HAmSZbDB7CusdRhgkD81VssRjQV5ZH13FbzCGcdnbbh6VwZ"),
-        node.dial("/dns4/vps-aaa00d52.vps.ovh.ca/tcp/8000/wss/p2p/16Uiu2HAm9PftGgHZwWE3wzdMde4m3kT2eYJFXLZfGoSED3gysofk")
-    ]);
-
     await node.start();
-    await node.waitForPeers();
 
     wakuNodeInstance = node;
     (window as any).waku = node;
@@ -70,10 +54,6 @@ export function createWakuEncoder(contentTopic: string) {
     try{
         return createEncoder({
             contentTopic: contentTopic,
-            pubsubTopicShardInfo: {
-                clusterId: 42,
-                shard: 0,
-            }
         });
     }catch(error) {
         console.error("Failed to create Waku encoder:", error);
@@ -82,5 +62,5 @@ export function createWakuEncoder(contentTopic: string) {
 }
 
 export function createWakuDecoder(contentTopic: string) {
-    return createDecoder(contentTopic, { clusterId: 42, shard: 0 });
+    return createDecoder(contentTopic);
 }
