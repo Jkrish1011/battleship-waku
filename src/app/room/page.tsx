@@ -19,16 +19,13 @@ declare global {
   }
 }
 
-function generateThreeDigitNumber(): number {
-    // Generate a number between 0 (inclusive) and 1 (exclusive),
-    // multiply it by 900 to get a range of 0 to 899,
-    // add 100 to shift the range to 100 to 999,
-    // and use Math.floor to remove any decimal places.
-    return Math.floor(Math.random() * 900 + 100);
-  }
+function generateRoomID(): number {
+  return Math.floor(Math.random() * 9000 + 1000);
+}
 
 const Page = () => {
     const [username, setUsername] = useState<string>('');
+    const [roomId, setRoomId] = useState<string>('');
     const { address } = useWallet();
     const [games, setGames] = useState<any[]>([]);
     const router = useRouter();
@@ -55,7 +52,6 @@ const Page = () => {
         //               player2_board_commitment: game[7].toString(),
         //               player2_merkle_root: game[8].toString(),
         //               wakuRoomId: game[11].toString(),
-        //               // Add the rest of the fields based on your GameView struct
         //           };
         //       }
         //       return game;
@@ -79,27 +75,64 @@ const Page = () => {
     return(
       <>
         <Navbar />
-        <div className="flex flex-col items-center justify-center min-h-screen space-y-4">
-          <div className="flex flex-col items-center">
-            <input
-              className="px-4 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-              placeholder="Enter username"
-              type="text"
-              value={username}
-              onChange={e => setUsername(e?.target?.value)}
-            />
+        <div className="flex flex-col items-center justify-center min-h-screen w-full bg-gradient-to-br from-blue-50 via-white to-indigo-100 animate-fade-in">
+            {/* Shared Username Field */}
+            <div className="w-full max-w-xs mb-8">
+              <label className="block text-base font-semibold text-gray-700 mb-2 text-center tracking-wide">Username</label>
+              <input
+                className="w-full px-5 py-3 border border-gray-300 rounded-xl shadow-md placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-400/40 bg-white/80 transition-all text-lg text-center"
+                placeholder="Enter your username"
+                type="text"
+                value={username}
+                onChange={e => setUsername(e?.target?.value)}
+                maxLength={24}
+                autoFocus
+              />
+            </div>
+            {/* Cards Row */}
+            <div className="w-full max-w-3xl flex flex-col gap-8 md:flex-row md:gap-10 items-center justify-center">
+              {/* Create Room Card */}
+              <div className="flex-1 backdrop-blur-md bg-white/70 border border-gray-200 rounded-2xl shadow-xl hover:shadow-2xl transition-shadow duration-300 transform hover:-translate-y-1 animate-fade-in-card p-8 flex flex-col items-center">
+                <h3 className="text-2xl font-bold text-gray-800 mb-2 tracking-tight">Create New Room</h3>
+                <span className="mb-6 text-gray-500 text-sm text-center">Creates a new room and await for other player to join in</span>
+                <button
+                  className={`w-full px-4 py-3 rounded-xl text-white font-semibold text-lg transition-colors shadow-md ${!Boolean(username) ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 active:bg-blue-800 scale-[1.03]'}`}
+                  disabled={!Boolean(username)}
+                  onClick={() => {router.push(`/room/${generateRoomID()}?username=${username}`)}}>
+                  Create a new room
+                </button>
+              </div>
+              {/* Join Room Card */}
+              <div className="flex-1 backdrop-blur-md bg-white/70 border border-gray-200 rounded-2xl shadow-xl hover:shadow-2xl transition-shadow duration-300 transform hover:-translate-y-1 animate-fade-in-card p-8 flex flex-col items-center">
+                <h3 className="text-2xl font-bold text-gray-800 mb-2 tracking-tight">Join Existing Room</h3>
+                <span className="mb-6 text-gray-500 text-sm text-center">Join an existing room</span>
+                <label className="block text-sm font-medium text-gray-700 mb-1 w-full text-left">Room ID</label>
+                <input
+                  className="w-full px-4 py-3 mb-4 border border-gray-300 rounded-xl shadow-sm placeholder-gray-400 focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-400/40 bg-white/80 transition-all text-lg"
+                  placeholder="Enter room ID"
+                  type="text"
+                  value={roomId}
+                  onChange={e => setRoomId(e?.target?.value)}
+                  maxLength={24}
+                />
+                <button
+                  className={`w-full px-4 py-3 rounded-xl text-white font-semibold text-lg transition-colors shadow-md ${
+                    !Boolean(username) || !roomId.trim()
+                      ? 'bg-gray-400 cursor-not-allowed' 
+                      : 'bg-green-600 hover:bg-green-700 active:bg-green-800 scale-[1.03]'}
+                  `}
+                  disabled={!Boolean(username) || !roomId.trim()}
+                  onClick={() => {
+                    router.push(`/join/${roomId.trim()}?username=${username}`)
+                  }}
+                >
+                  Join Room
+                </button>
+              </div>
+            </div>
           </div>
-
-          <div>
-            <button
-              className={`px-4 py-2 rounded-md text-white font-bold ${!Boolean(username) ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-500 hover:bg-blue-700'}`}
-              disabled={!Boolean(username)}
-              onClick={() => {router.push(`/room/${generateThreeDigitNumber()}?username=${username}`)}}>
-              Create a new room
-            </button>
-          </div>
-
-          <div>
+         
+          {/* <div>
             {games.length > 0 && (
               <>
                 <div className="text-center text-gray-500 my-2">
@@ -168,8 +201,7 @@ const Page = () => {
                 </div>
               </>
             )}
-          </div>
-        </div>
+          </div> */}
       </>
     )
 };

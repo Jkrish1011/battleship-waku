@@ -18,6 +18,7 @@ const Page = () => {
     useEffect(() => {
         console.log({roomId});
         const _contentTopic = `/waku-battle-ship-tutorial-${roomId}/1/private-message/proto`;
+        console.log("contentTopic from join route", _contentTopic);
         setContentTopic(_contentTopic);
     }, [roomId]);
 
@@ -25,7 +26,7 @@ const Page = () => {
         // <ContentPairProvider contentTopic={`/waku-battle-ship-tutorial-${roomId}/1/private-message/proto`}>
         <>
         <Navbar />
-        <div className="flex flex-col items-center justify-center min-h-screen space-y-4">
+        <div className="flex flex-col items-center justify-center min-h-screen space-y-4 pt-20">
             <div className="text-lg font-bold text-center">
                 Welcome, <span className="text-green-500">{username}</span> <br />
                 you have joined the room <span className="text-blue-500"> {roomId} </span>

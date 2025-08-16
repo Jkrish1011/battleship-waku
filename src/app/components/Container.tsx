@@ -23,6 +23,7 @@ const Container = (props: {
     const [messages, setMessages] = useState<Message[]>();
     const [latestMessage, setLatestMessage] = useState<Message>({} as Message);
     const [opponentProofs, setOpponentProofs] = useState<Message>({} as Message);
+    const [opponentBoardCommitment, setOpponentBoardCommitment] = useState<Message>({} as Message);
     const [opponentCalldataProofs, setOpponentCalldataProofs] = useState<Message>({} as Message);
     const [opponentMoveProofs, setOpponentMoveProofs] = useState<Message[]>([]);
     const [opponentSignature, setOpponentSignature] = useState<Message>({} as Message);
@@ -56,6 +57,8 @@ const Container = (props: {
                 if(_latestMessage?.sender.toString().toLowerCase() !== player.toString().toLowerCase() ) {
                     if(_latestMessage?.proof) {
                         setOpponentProofs(JSON.parse(_latestMessage.proof));
+                    } else if (_latestMessage?.commitment) {
+                        setOpponentBoardCommitment(JSON.parse(_latestMessage.commitment));  
                     } else if (_latestMessage?.calldata) {
                         setOpponentCalldataProofs(JSON.parse(_latestMessage.calldata));
                     } else if(_latestMessage?.message || _latestMessage?.move) {
@@ -85,6 +88,7 @@ const Container = (props: {
 
 
     useEffect(() => {
+        console.log("contentTopic", contentTopic);
         subscribeToMessages();
     }, [wakuNode]);
 
@@ -112,6 +116,8 @@ const Container = (props: {
                     localShips={localShips}
                     contentTopic={contentTopic}
                     opponentSignature={opponentSignature}
+                    opponentBoardCommitment={opponentBoardCommitment}
+                    isGameReady={isGameReady(messages || [])}
                 />
 
                 {

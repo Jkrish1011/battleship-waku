@@ -13,5 +13,6 @@ export type Message = {
   proof?: string;
   calldata?: string;
   moveProof?: string;
+  commitment?: string;
   signature?: string;
 };
