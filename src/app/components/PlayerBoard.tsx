@@ -94,6 +94,7 @@ function PlayerBoard(props: {
     useEffect(() => {
       (async() => {
         if(isGameReady) {
+          console.log("GAME IS NOW READY!!!");
           const proof_converted = {
             pA: calldataPlayer[0],
             pB: calldataPlayer[1],
@@ -123,25 +124,27 @@ function PlayerBoard(props: {
               opponentCalldataProofs: opponent_proof_converted
             }
           );
-          // const tx = await gameStateChannel?.openChannel(_opponentSignature?.address);
+          const battleshipWaku = await getContract(process.env.NEXT_PUBLIC_BATTLESHIP_CONTRACT_ADDRESS as string, battleshipStateChannelAbi.abi);
+          const tx = await battleshipWaku?.openChannel(opponentInitialSignature?.address);
 
-          // const receipt = await tx.wait();
+          const receipt = await tx.wait();
           
-          // const channelOpenedEvent = receipt.logs.find((log: any) => {
-          //     try {
-          //         const parsed = battleshipWaku.interface.parseLog(log);
-          //         return parsed?.name === 'ChannelOpened';
-          //     } catch {
-          //         return false;
-          //     }
-          // });
+          const channelOpenedEvent = receipt.logs.find((log: any) => {
+              try {
+                  const parsed = battleshipWaku.interface.parseLog(log);
+                  return parsed?.name === 'ChannelOpened';
+              } catch {
+                  return false;
+              }
+          });
           
-          // const channelId = channelOpenedEvent ? 
-          //     battleshipWaku.interface.parseLog(channelOpenedEvent).args.channelId : 
-          //     null;
+          const channelId = channelOpenedEvent ? 
+              battleshipWaku?.interface.parseLog(channelOpenedEvent).args.channelId : 
+              null;
 
+            console.log("channelId", channelId);
           const {hash, signature} = await gameStateChannel?.createGame(
-            "1",
+            channelId,
             roomId,
             address,
             player1_gameState?.commitment,
