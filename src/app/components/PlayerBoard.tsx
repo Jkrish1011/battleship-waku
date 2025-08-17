@@ -3,10 +3,10 @@
 import React, { useState, useEffect } from "react";
 import { Player, Message } from "../types";
 
-import { BOARD_SIZE, createBoard, Ship, SHIPS, ChatMessage, MoveReplyMessage, BoardProofMessage, BoardProofCalldataMessage, SignatureMessage } from "../utils/gameUtils";
+import { BOARD_SIZE, createBoard, Ship, SHIPS, ChatMessage, MoveReplyMessage, BoardProofMessage, BoardCommitmentMessage, BoardProofCalldataMessage, SignatureMessage } from "../utils/gameUtils";
 // import { BattleshipGameGenerator } from "./helpers/GameGenerator";
 import { GameStateChannel } from "./helpers/GameStateChannel";
-import { getContract } from "../utils/gameUtils";
+import { getContract, isGameReady } from "../utils/gameUtils";
 import battleshipStateChannelAbi from "./../abi/BattleshipStateChannel.json" assert { type: "json" };
 import { useWallet } from "../store/useWallet";
 import Image from "next/image";
@@ -30,8 +30,10 @@ function PlayerBoard(props: {
   localShips?: Ship[],
   contentTopic: string,
   opponentSignature?: Message | null,
+  isGameReady?: boolean,
+  opponentBoardCommitment?: Message | null,
 }) {
-    const {node, isLoading, player, latestMessage, roomId, joinedOrCreated, gameId, opponentProofs, localShips, opponentCalldataProofs, opponentMoveProofs, contentTopic, opponentSignature} = props;
+    const {node, isLoading, player, latestMessage, roomId, joinedOrCreated, gameId, opponentProofs, localShips, opponentCalldataProofs, opponentMoveProofs, contentTopic, opponentSignature, isGameReady, opponentBoardCommitment} = props;
     
     if(!contentTopic) {
       console.log("No content topic found!");
@@ -54,6 +56,7 @@ function PlayerBoard(props: {
     const [txDetails, setTxDetails] = useState<any>(null);
     const [txError, setTxError] = useState<string|null>(null);
     const [proofPlayer, setProofPlayer] = useState<any>(null);
+    const [commitmentCurrPlayer, setCommitmentCurrPlayer] = useState<any>(null);
     const [moveProofOpponentPlayer, setMoveProofOpponentPlayer] = useState<any>(null);
     const [calldataProofOpponentPlayer, setCalldataProofOpponentPlayer] = useState<any>(opponentCalldataProofs || null);
     const [proofOpponentPlayer, setProofOpponentPlayer] = useState<any[]>([]);
@@ -62,6 +65,7 @@ function PlayerBoard(props: {
     const [moveVerificationJson, setMoveVerificationJson] = useState<string|null>(null);
     const [shipsLocal, setShipsLocal] = useState<Ship[]>(localShips || []);
     const [games, setGames] = useState<any[]>([]);
+    const [opponentInitialSignature, setOpponentInitialSignature] = useState<any>(null);
     const [isWalletInitialized, setIsWalletInitialized] = useState(false);
     const [selectedOpponentProofTab, setSelectedOpponentProofTab] = useState(0);
     const [gameStateChannel, setGameStateChannel] = useState<GameStateChannel | null>(null);
@@ -86,6 +90,74 @@ function PlayerBoard(props: {
             cleanupWalletListeners();
         };
     }, []);
+
+    useEffect(() => {
+      (async() => {
+        if(isGameReady) {
+          console.log("GAME IS NOW READY!!!");
+          const proof_converted = {
+            pA: calldataPlayer[0],
+            pB: calldataPlayer[1],
+            pC: calldataPlayer[2],
+            pubSignals: calldataPlayer[3]
+          }
+          const opponent_proof_converted = {
+            pA: opponentCalldataProofs?.[0] || "",
+            pB: opponentCalldataProofs?.[1] || "",
+            pC: opponentCalldataProofs?.[2] || "",
+            pubSignals: opponentCalldataProofs?.[3] || ""
+          }
+          const board_state = JSON.parse(localStorage.getItem(CURRENT_BOARD_INPUT_STATE) || "");
+          const player1_gameState = await gameStateChannel?.generateShipPlacementProof(proof_converted, board_state.board_state, board_state.merkle_root, board_state.salt, board_state.commitment, board_state.merkle_root);
+          
+          console.log(
+            {
+              channelId: "1",
+              wakuRoomId: roomId,
+              player1Address: address,
+              player1ShipCommitment: player1_gameState?.commitment,
+              player1ShipMerkleRoot: player1_gameState?.merkleRoot,
+              player1ShipPlacementProof: player1_gameState?.merkleRoot,
+              opponentAddress: opponentInitialSignature?.address,
+              opponentCommitment: opponentBoardCommitment?.commitment || "",
+              opponentProofs: opponentProofs,
+              opponentCalldataProofs: opponent_proof_converted
+            }
+          );
+          const battleshipWaku = await getContract(process.env.NEXT_PUBLIC_BATTLESHIP_CONTRACT_ADDRESS as string, battleshipStateChannelAbi.abi);
+          const tx = await battleshipWaku?.openChannel(opponentInitialSignature?.address);
+
+          const receipt = await tx.wait();
+          
+          const channelOpenedEvent = receipt.logs.find((log: any) => {
+              try {
+                  const parsed = battleshipWaku.interface.parseLog(log);
+                  return parsed?.name === 'ChannelOpened';
+              } catch {
+                  return false;
+              }
+          });
+          
+          const channelId = channelOpenedEvent ? 
+              battleshipWaku?.interface.parseLog(channelOpenedEvent).args.channelId : 
+              null;
+
+            console.log("channelId", channelId);
+          const {hash, signature} = await gameStateChannel?.createGame(
+            channelId,
+            roomId,
+            address,
+            player1_gameState?.commitment,
+            player1_gameState?.merkleRoot,
+            player1_gameState?.merkleRoot,
+            opponentInitialSignature?.address,
+            opponentBoardCommitment?.commitment || "",
+            opponentProofs,
+            opponentCalldataProofs
+          )
+        }
+      })();
+    }, [isGameReady]);
     
     useEffect(() => {
       const initializeGameStateChannel = async () => {
@@ -120,10 +192,9 @@ function PlayerBoard(props: {
     };
 
     useEffect(() => {
-      if(Object.keys(opponentSignature).length > 0 && gameStateChannel) {
-        console.log("opponent signature received!");
-        console.log(opponentSignature);
+      if(opponentSignature && Object.keys(opponentSignature).length > 0 && gameStateChannel) {
         const _opponentSignature = JSON.parse(opponentSignature?.signature || "");
+        setOpponentInitialSignature(_opponentSignature);
         (async () => {
           const isValid = await gameStateChannel.verifyCustomMessage(_opponentSignature);
           console.log("isValid", isValid);
@@ -276,6 +347,24 @@ function PlayerBoard(props: {
                       player2_board_commitment: game[7],
                       player2_merkle_root: game[8],
                       wakuRoomId: game[11],
+                      // stateHash
+                      // nonce
+                      // currentTurn
+                      // moveCount
+                      // player1ShipCommitment
+                      // player2ShipCommitment
+                      // player1Hits
+                      // player2Hits
+                      // gameEnded
+                      // winner
+                      // timestamp
+                      // lastMoveHash
+                      // gameId
+                      // wakuRoomId
+                      // player1
+                      // player2
+                      // localPlayerRole
+                      // movesData
                   };
               }
               return game;
@@ -368,13 +457,15 @@ function PlayerBoard(props: {
         return;
       }
       
-      await joinGame();
+      // await joinGame();
         
       console.log('sending calldataplayer message');
       console.log({calldataPlayer});
       await sendBoardCalldataMessage(JSON.stringify(calldataPlayer));
       console.log('sending proofPlayer message');
       await sendBoardProofMessage(JSON.stringify(proofPlayer));
+      console.log('sending commitmentCurrPlayer message');
+      await sendBoardCommitmentMessage(JSON.stringify(commitmentCurrPlayer));
       console.log('Ready Message');
       await sendMessage(player, 'ready');
     }
@@ -456,6 +547,7 @@ function PlayerBoard(props: {
         const {proof: _proofPlayer, calldata: _calldataPlayer} = await gameStateChannel?.generateProof(correctInput, wasmBuffer as Uint8Array, zkeyBuffer as Uint8Array);
         setProofPlayer(_proofPlayer);
         setCalldataPlayer(_calldataPlayer);
+        setCommitmentCurrPlayer(correctInput?.commitment);
         // console.log({ships});
 
         // localStorage.setItem(`ships_${roomId}`, JSON.stringify(ships.map(item => ({...item, placed: false}))));
@@ -765,6 +857,46 @@ function PlayerBoard(props: {
       }
     }
 
+    const sendBoardCommitmentMessage = async (proof: string) => {
+    
+      console.log("sending commitment message");
+      // 1/ create message
+      const newMessage = BoardCommitmentMessage.create({
+        timestamp: Date.now(),
+        sender: player,
+        commitment: proof,
+        id: crypto.randomUUID()
+      });
+
+      // 2/ Serialize message
+      const serializedMessage = BoardCommitmentMessage.encode(newMessage).finish();
+
+      // 3/ Push Message
+      // if (push) {
+      //   const pushRes = await push({
+      //     timestamp: new Date(),
+      //     payload: serializedMessage
+      //   });
+        
+      //   if (pushRes?.errors?.length && pushRes?.errors?.length) {
+      //     alert('unable to connect to a stable node. please reload the page!');
+      //   }
+      // }
+
+      const result = await node.lightPush.send(encoder, {
+        payload: serializedMessage,
+        timestamp: new Date(),
+      }, { autoRetry: true });
+
+      if (result.successes.length > 0) {
+        console.log(`message sent successfully.`);
+      } else {
+        console.warn(`Failed to send message:`, result.failures);
+      }
+    }
+
+    
+
     const sendBoardCalldataMessage = async (proof: string) => {
     
       console.log("sending calldata message");
@@ -988,8 +1120,6 @@ function PlayerBoard(props: {
           </div>
         </div>
         )}
-        {/* "@waku/react": "^0.0.7-559159a",
-        "@waku/sdk": "^0.0.29", */}
         {moveProofOpponentPlayer && moveProofOpponentPlayer?.length > 0 && (
           <div id="proof-container" className="mt-8 p-4 bg-gray-50 rounded-lg border border-gray-200">
             <div className="space-y-4">

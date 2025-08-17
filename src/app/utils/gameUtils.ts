@@ -1,5 +1,5 @@
 
-import { Message, Player } from "../types";
+import { Message } from "../types";
 import protobuf from "protobufjs";
 import { ethers } from "ethers";
 
@@ -77,6 +77,12 @@ const BoardProofMessage = new protobuf.Type("BoardProofMessage")
   .add(new protobuf.Field("proof", 7, "string"))
   .add(new protobuf.Field("id", 4, "string"));
 
+const BoardCommitmentMessage = new protobuf.Type("BoardCommitmentMessage")
+  .add(new protobuf.Field("timestamp", 1, "uint64"))
+  .add(new protobuf.Field("sender", 2, "string"))
+  .add(new protobuf.Field("commitment", 11, "string"))
+  .add(new protobuf.Field("id", 4, "string"));
+
 const BoardProofCalldataMessage = new protobuf.Type("BoardProofCalldataMessage")
   .add(new protobuf.Field("timestamp", 1, "uint64"))
   .add(new protobuf.Field("sender", 2, "string"))
@@ -143,6 +149,14 @@ const decodeMessage = (wakuMessage: any) => {
       return { timestamp, sender, signature, id };
     }
 
+    var { timestamp, sender, commitment, id } = BoardCommitmentMessage.decode(
+      wakuMessage.payload
+    );
+
+    if(commitment) {
+      return { timestamp, sender, commitment, id };
+    } 
+
     return {};
   } catch (err) {
     console.error(err);
@@ -203,6 +217,7 @@ export {
   MoveReplyMessage,
   BoardProofMessage,
   BoardProofCalldataMessage,
+  BoardCommitmentMessage,
   SignatureMessage,
   decodeMessage,
   getContract,
